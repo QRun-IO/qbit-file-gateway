@@ -14,17 +14,40 @@ code and QInstance. Design: `docs/DESIGN.md`.
 ## Build commands
 
 ```bash
-./mvnw compile
-./mvnw test
-./mvnw verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
+./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT compile
+./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT test
+./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
 ```
 
-Use the Maven 3.9.11 wrapper (Java 21); Maven 3.10 cannot read the parent POM. On Windows use `./mvnw.cmd`.
+Use the Maven 3.9.11 wrapper (Java 21); Maven 3.10 cannot read the parent POM. On Windows use `./mvnw.cmd` and quote the `-Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT` argument in PowerShell.
+Keep the POM default at `4.1.0-SNAPSHOT` for CI; the private version prevents local artifact replacement.
 
 ## Architecture
 
 Package: `com.kingsrook.qbits.filegateway`. Entry point: `FileGatewayQBitProducer implements
 QBitMetaDataProducer<FileGatewayQBitConfig>`.
+
+- `metadata/`: seven stable tables, enum/picker sources, joins, typed child widgets, key/account
+  validators and streamed Review/Result admin actions. Producer adds metadata to the QInstance.
+- `model/`: QRecordEntity mappings; DDL in `docs/ddl/file_gateway.sql` uses UTC zone-less timestamps.
+- `permissions/`: view/admin/connect constants and the custom permission checker; system-written
+  logs/jobs/outbox tables remain read-only to people.
+- `FileGatewayRuntime`: host-owned startup after the UI API server, in-memory host-key parsing,
+  injectable environment and clock/test hooks. Production polling interval is 60 seconds.
+- `sftp/`: public-key-only MINA listener, per-account transactional authentication, per-pod IP
+  windows, token refresh/revocation and system-session bookkeeping restricted to owned tables.
+- `vfs/`: custom NIO filesystem; per-session UI API metadata/saved-object caches. Every API call
+  checks its operation spec and sends user credentials plus `sftp/<sessionId>` client detail.
+- `api/`: isolated consumer/outbox contract. Never import gateway implementation packages here.
+
+Phase (a) supports listing/stat and denies reads/mutations with audit. Upload/download workers,
+endpoint routing/chroot, outbox delivery, Quick Search/ESB, preferences, retention and the app
+home belong to later phases. The core-valid alert type is `filegateway.lockout`; the design's
+underscore-only name is rejected by core validation.
+
+Tests run a strict UI API server, H2 from the adopter DDL and real MINA clients. NoDiskExtension
+snapshots the working tree (excluding target) and isolated test home, and asserts the test temp
+directory is empty. The host supplies RDBMS; `qqq-backend-module-rdbms` must remain test-scoped.
 
 ## Invariants and naming
 
