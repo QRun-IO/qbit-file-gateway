@@ -602,7 +602,7 @@ The gateway is a separate, stateless Deployment of the same image. An example is
   - Liveness: HTTP health.
   - Startup: allows 2 minutes for the QInstance.
 - **Service.** `type: LoadBalancer`, with these settings:
-  - the annotation `lbipam.cilium.io/ips: <one of 10.100.22.60-.69>`;
+  - the annotation `lbipam.cilium.io/ips: 10.100.22.65` in kof22 (owner, 2026-10-13; .60, .61 and .64 are taken);
   - **port 22 → 2222 only (no passive range in v1)**;
   - `externalTrafficPolicy: Local`, so the pod sees the real client IP for allowlists and
     lockouts.
@@ -714,7 +714,7 @@ Apache FtpServer, over the same virtual tree, UI API client, jobs and audit:
 - **Tests.** Protocol tests with the Commons Net `FTPSClient`.
 
 ## 16. Owner steps
-- Pick the LoadBalancer IP (10.100.22.60–.69).
+- The LoadBalancer IP is 10.100.22.65 (decided 2026-10-13); reserve it in the cluster-gitops PR.
 - Create the host key secret (`FILE_GATEWAY_SSH_HOST_KEY`) in Infisical.
 - Add the UniFi port forward.
 - Grant `file_gateway.connect` to the roles that may use SFTP, and `file_gateway.admin` to admins.
