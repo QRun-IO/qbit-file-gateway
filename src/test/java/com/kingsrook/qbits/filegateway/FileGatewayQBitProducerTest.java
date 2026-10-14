@@ -52,8 +52,8 @@ class FileGatewayQBitProducerTest
       assertThat(instance.getApp("file_gateway").getSections().stream().flatMap(s -> s.getTables().stream()).toList())
          .containsExactlyElementsOf(FileGatewayTables.MAIN);
       assertThat(instance.getJoins()).hasSize(6);
-      assertThat(instance.getWidgets()).hasSize(6);
-      assertThat(instance.getPossibleValueSources()).hasSize(19);
+      assertThat(instance.getWidgets()).hasSize(16);
+      assertThat(instance.getPossibleValueSources()).hasSize(20);
       instance.getTables().values().forEach(t ->
       {
          assertThat(t.getBackendName()).isEqualTo("host-db");

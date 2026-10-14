@@ -94,6 +94,10 @@ public class FileGatewayConnectionLog extends QRecordEntity
 
 
 
+   @QField
+   private Instant endRequestedAt;
+
+
    /*******************************************************************************
     ** Create an empty entity.
     *******************************************************************************/
@@ -698,5 +702,36 @@ public class FileGatewayConnectionLog extends QRecordEntity
    public void setClientChannel(String clientChannel)
    {
       this.clientChannel = clientChannel;
+   }
+
+
+
+   /*******************************************************************************
+    ** Getter for endRequestedAt.
+    *******************************************************************************/
+   public Instant getEndRequestedAt()
+   {
+      return (endRequestedAt);
+   }
+
+
+
+   /*******************************************************************************
+    ** Setter used by QRecordEntity population.
+    *******************************************************************************/
+   public void setEndRequestedAt(Instant endRequestedAt)
+   {
+      this.endRequestedAt = endRequestedAt;
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for endRequestedAt.
+    *******************************************************************************/
+   public FileGatewayConnectionLog withEndRequestedAt(Instant endRequestedAt)
+   {
+      this.endRequestedAt = endRequestedAt;
+      return (this);
    }
 }

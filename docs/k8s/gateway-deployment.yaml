@@ -1,0 +1,91 @@
+# qbit-file-gateway: the SFTP gateway Deployment (docs/DESIGN.md section 11).
+# Same image and QInstance as the application's web Deployment; only FILE_GATEWAY_SFTP_ENABLED differs.
+# Stateless: no volumes except an in-memory JVM temp area. State lives in the database and object storage.
+# Replace every <PLACEHOLDER> and copy the application's usual environment (database, object storage, auth).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <APP>-file-gateway
+  labels:
+    app.kubernetes.io/name: <APP>-file-gateway
+    app.kubernetes.io/component: sftp-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: <APP>-file-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: <APP>-file-gateway
+        app.kubernetes.io/component: sftp-gateway
+    spec:
+      terminationGracePeriodSeconds: 75   # SIGTERM: stop accepting, drain sessions up to 60 s, requeue claimed jobs
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: <APP_IMAGE>                # the same image as the web Deployment
+          env:
+            - name: FILE_GATEWAY_SFTP_ENABLED
+              value: "true"
+            - name: FILE_GATEWAY_SSH_HOST_KEY  # OpenSSH private key text; parsed in memory, never written to disk
+              valueFrom:
+                secretKeyRef:
+                  name: file-gateway-host-key
+                  key: ssh_host_key
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Djava.io.tmpdir=/tmp"
+            # ... the application's usual environment (database, object storage, authentication) ...
+          ports:
+            - name: sftp
+              containerPort: 2222
+            - name: http                     # loopback /qqq/v1 calls and kubelet probes only; not in the Service
+              containerPort: 8000
+          readinessProbe:
+            tcpSocket:
+              port: sftp
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: <APP_HEALTH_PATH>
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: <APP_HEALTH_PATH>
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24             # up to 2 minutes for the QInstance
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              memory: 2Gi                    # includes the in-memory /tmp below and the bounded transfer buffers
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp                          # JVM temp only (core stages a rendered report here and deletes it)
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: <APP>-file-gateway
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: <APP>-file-gateway

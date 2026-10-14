@@ -40,7 +40,7 @@ class EntityContractTest
     ** Verify annotations, metadata completeness and fluent accessors against QRecord conversion.
     *******************************************************************************/
    @ParameterizedTest
-   @ValueSource(strings = {"Account", "SshKey", "Alias", "UploadJob", "OutboxFile", "TransferLog", "ConnectionLog"})
+   @ValueSource(strings = {"Account", "SshKey", "Alias", "UploadJob", "OutboxFile", "TransferLog", "ConnectionLog", "Server"})
    void entityRoundTrip(String suffix) throws Exception
    {
       Class<?> type = Class.forName("com.kingsrook.qbits.filegateway.model.FileGateway" + suffix);

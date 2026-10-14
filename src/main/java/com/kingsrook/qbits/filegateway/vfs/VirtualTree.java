@@ -71,6 +71,7 @@ public class VirtualTree
    private UploadJobs uploads;
    private GatewayObjectStore store;
    private GeneratedDownloads downloads;
+   private com.kingsrook.qbits.filegateway.outbox.OutboxService outbox;
    private JsonNode metadata;
    private Instant metadataAt;
    private final Map<String, JsonNode> saved = new HashMap<>();
@@ -108,6 +109,17 @@ public class VirtualTree
    public VirtualTree withDownloads(GeneratedDownloads downloads)
    {
       this.downloads = downloads;
+      return (this);
+   }
+
+
+
+   /*******************************************************************************
+    ** Use the same provider in the web deployment and the virtual outbox folders.
+    *******************************************************************************/
+   public VirtualTree withOutbox(com.kingsrook.qbits.filegateway.outbox.OutboxService outbox)
+   {
+      this.outbox = outbox;
       return (this);
    }
 
@@ -216,8 +228,41 @@ public class VirtualTree
     *******************************************************************************/
    private List<Node> children(String path) throws IOException
    {
+      List<Node> nodes = rawChildren(path);
+      if(Boolean.TRUE.equals(session.account.getValueBoolean("pgpEncryptDownloads")))
+      {
+         return (nodes.stream().map(node -> node.directory() || "TEMPORARY".equals(node.kind()) ? node
+            : new Node(node.path() + ".pgp", false, node.kind(), node.objectId(), 0, node.job())).toList());
+      }
+      return (nodes);
+   }
+
+
+
+   /*******************************************************************************
+    ** Resolve canonical plaintext paths before applying download encryption names.
+    *******************************************************************************/
+   private List<Node> rawChildren(String path) throws IOException
+   {
       JsonNode meta = metadata();
       List<Node> result = new ArrayList<>();
+      List<Node> endpoints = endpointChildren(path, meta);
+      if(!endpoints.isEmpty() || endpointMount(path, meta) != null)
+      {
+         result.addAll(endpoints);
+         if(!"/".equals(path))
+         {
+            return (result);
+         }
+      }
+      if("ENDPOINTS_ONLY".equals(session.account.getValueString("rootMode")))
+      {
+         if("/".equals(path))
+         {
+            return (result);
+         }
+         throw (new NoSuchFileException(path));
+      }
       if("/".equals(path))
       {
          addAppChildren(result, "", meta.path("appTree"), meta);
@@ -337,6 +382,130 @@ public class VirtualTree
 
 
    /*******************************************************************************
+    ** Endpoint targets are resolved from the same user-scoped saved-object queries.
+    *******************************************************************************/
+   private List<QRecord> visibleEndpoints(JsonNode meta) throws IOException
+   {
+      try
+      {
+         List<QRecord> visible = new ArrayList<>();
+         for(QRecord alias : audit.query(FileGatewayTables.ALIAS, UploadJobs.equal("isActive", true)))
+         {
+            if(alias.getValue("accountId") != null && !java.util.Objects.equals(alias.getValue("accountId"), session.account.getValue("id")))
+            {
+               continue;
+            }
+            String kind = alias.getValueString("kind");
+            if(List.of("INBOX", "OUTBOX").contains(kind))
+            {
+               visible.add(alias);
+               continue;
+            }
+            String table = alias.getValueString("tableName");
+            if(table == null || !meta.path("tables").has(table))
+            {
+               continue;
+            }
+            String source = "BULK_LOAD".equals(kind) ? "savedBulkLoadProfile" : "VIEW".equals(kind) ? "savedView" : "savedReport";
+            if(!meta.path("tables").has(source)
+               || ("BULK_LOAD".equals(kind) && (!meta.path("tables").path(table).path("insertPermission").asBoolean(false) || !meta.path("processes").has(table + ".bulkInsert")))
+               || ("REPORT".equals(kind) && (downloads == null || !downloads.reportsAvailable() || !meta.path("processes").has("renderSavedReport"))))
+            {
+               continue;
+            }
+            for(JsonNode row : saved(source, table))
+            {
+               if(row.path("values").path("id").asText().equals(alias.getValueString(source + "Id")))
+               {
+                  alias.withValue("_label", row.path("values").path("label").asText());
+                  visible.add(alias);
+                  break;
+               }
+            }
+         }
+         return (visible);
+      }
+      catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+      {
+         throw (new IOException("Unable to resolve endpoints", e));
+      }
+   }
+
+
+
+   /*******************************************************************************
+    ** An exact visible mount, including an empty upload or outbox folder.
+    *******************************************************************************/
+   private QRecord endpointMount(String path, JsonNode meta) throws IOException
+   {
+      return (visibleEndpoints(meta).stream().filter(alias -> path.equals(alias.getValueString("path"))).findFirst().orElse(null));
+   }
+
+
+
+   /*******************************************************************************
+    ** Mount ancestors reveal only the next segment, preserving endpoint chroots.
+    *******************************************************************************/
+   private List<Node> endpointChildren(String path, JsonNode meta) throws IOException
+   {
+      List<Node> nodes = new ArrayList<>();
+      String prefix = "/".equals(path) ? "/" : path + "/";
+      for(QRecord alias : visibleEndpoints(meta))
+      {
+         String mount = alias.getValueString("path");
+         if(mount.startsWith(prefix))
+         {
+            String suffix = mount.substring(prefix.length()).split("/")[0];
+            String child = prefix + suffix;
+            if(nodes.stream().noneMatch(node -> child.equals(node.path())))
+            {
+               nodes.add(new Node(child, true, "ENDPOINT", alias.getValueString("id"), 0, mount.equals(child) ? alias : null));
+            }
+         }
+         if(!mount.equals(path))
+         {
+            continue;
+         }
+         String kind = alias.getValueString("kind");
+         if(List.of("BULK_LOAD", "INBOX").contains(kind))
+         {
+            nodes.addAll(artifacts("", alias.getValueString("tableName"), path, "upload"));
+         }
+         else if("OUTBOX".equals(kind) && outbox != null)
+         {
+            try
+            {
+               for(QRecord row : outbox.list(alias.getValueInteger("id")))
+               {
+                  nodes.add(new Node(prefix + row.getValueString("fileName"), false, "OUTBOX", row.getValueString("id"), row.getValueLong("sizeBytes"), row));
+               }
+            }
+            catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+            {
+               throw (new IOException("Unable to list outbox", e));
+            }
+         }
+         else if(List.of("VIEW", "REPORT").contains(kind))
+         {
+            String format = alias.getValueString("format");
+            String formats = session.account.getValueString("formats");
+            if(format != null && List.of((formats == null ? "csv,xlsx" : formats).split("[,\\s]+")).contains(format))
+            {
+               String name = alias.getValueString("fileName");
+               if(name == null || name.isBlank())
+               {
+                  name = slug(alias.getValueString("_label")) + "." + format;
+               }
+               nodes.add(new Node(prefix + name, false, kind, alias.getValueString("VIEW".equals(kind) ? "savedViewId" : "savedReportId"), 0, alias));
+            }
+         }
+      }
+      return (nodes);
+   }
+
+
+
+   /*******************************************************************************
     ** Sidecars and results expire after seven days; archive objects remain until retention.
     *******************************************************************************/
    private List<Node> artifacts(String prefix, String table, String path, String folder) throws IOException
@@ -375,7 +544,7 @@ public class VirtualTree
                job.getValueLong("resultsSizeBytes") == null ? 0 : job.getValueLong("resultsSizeBytes"), job));
          }
          if("archive".equals(folder) && !active && job.getValueString("sha256") != null
-            && !job.getValueString("storageKey").startsWith("file-gateway/quarantine/"))
+            && job.getValueString("storageKey") != null && !job.getValueString("storageKey").startsWith("file-gateway/quarantine/"))
          {
             String date = job.getValueInstant("createDate").atZone(ZoneOffset.UTC).toLocalDate().toString();
             String directory = prefix + "/archive/" + date;
@@ -423,6 +592,12 @@ public class VirtualTree
    {
       String parent = path.substring(0, path.lastIndexOf('/'));
       Node target = stat(parent);
+      if(uploads != null && target.job() != null && "ENDPOINT".equals(target.kind())
+         && List.of("BULK_LOAD", "INBOX").contains(target.job().getValueString("kind")))
+      {
+         QRecord alias = target.job();
+         return (uploads.receive(session, path, alias.getValueString("tableName"), alias.getValueInteger("savedBulkLoadProfileId"), alias));
+      }
       if(uploads == null || !target.directory() || !"PROFILE".equals(target.kind()) || target.objectId() == null)
       {
          deny(path, "UPLOAD", "Uploads require a bulk load profile folder");
@@ -440,6 +615,82 @@ public class VirtualTree
    public SeekableByteChannel read(String path) throws IOException
    {
       Node node = stat(path);
+      if(Boolean.TRUE.equals(session.account.getValueBoolean("pgpEncryptDownloads")) && !node.directory() && path.endsWith(".pgp"))
+      {
+         String plainPath = path.substring(0, path.length() - 4);
+         Node plain = rawChildren(plainPath.substring(0, plainPath.lastIndexOf('/'))).stream()
+            .filter(candidate -> candidate.path().equals(plainPath)).findFirst().orElseThrow(() -> new NoSuchFileException(path));
+         return (encrypted(plain));
+      }
+      return (readNode(node));
+   }
+
+
+
+   /*******************************************************************************
+    ** Encrypt lazily into the existing fixed rolling window, without a producer thread.
+    *******************************************************************************/
+   private SeekableByteChannel encrypted(Node node) throws IOException
+   {
+      SeekableByteChannel source = readNode(node);
+      try
+      {
+         var encrypted = com.kingsrook.qbits.filegateway.pgp.PgpStreams.encrypt(java.nio.channels.Channels.newInputStream(source),
+            session.account.getValueString("pgpPublicKey"), node.path().substring(node.path().lastIndexOf('/') + 1));
+         boolean[] complete = {false};
+         var tracked = new java.io.FilterInputStream(encrypted)
+         {
+            @Override
+            public int read(byte[] bytes, int offset, int length) throws IOException
+            {
+               int count = in.read(bytes, offset, length);
+               if(count < 0)
+               {
+                  complete[0] = true;
+               }
+               return (count);
+            }
+         };
+         return (new com.kingsrook.qbits.filegateway.storage.GeneratedReadChannel(tracked, 65536, new com.kingsrook.qbits.filegateway.storage.GeneratedReadChannel.Audit()
+         {
+            @Override
+            public void charge(int bytes)
+            {
+               // The underlying transfer accounts for plaintext bytes and applies its limits.
+            }
+
+            @Override
+            public void finish(IOException failure) throws IOException
+            {
+               if(complete[0] && failure == null && "OUTBOX".equals(node.kind()))
+               {
+                  try
+                  {
+                     outbox.downloaded(node.job());
+                  }
+                  catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+                  {
+                     throw (new IOException("Unable to acknowledge encrypted outbox", e));
+                  }
+               }
+            }
+         }));
+      }
+      catch(IOException | RuntimeException e)
+      {
+         source.close();
+         throw (e);
+      }
+   }
+
+
+
+   /*******************************************************************************
+    ** Open a resolved plaintext node through its original authorized delivery path.
+    *******************************************************************************/
+   private SeekableByteChannel readNode(Node node) throws IOException
+   {
+      String path = node.path();
       if(downloads != null && !node.directory() && List.of("VIEW", "REPORT").contains(node.kind()))
       {
          return (downloads.open(node));
@@ -460,7 +711,22 @@ public class VirtualTree
          return (new ObjectReadChannel(content.length, (start, end) -> new ByteArrayInputStream(content, (int) start, (int) (end - start + 1)), completion));
       }
       String key = node.job().getValueString("RESULT".equals(node.kind()) ? "resultsStorageKey" : "storageKey");
-      return (new ObjectReadChannel(node.size(), (start, end) -> store.openRange(key, start, end), completion));
+      ObjectReadChannel channel = new ObjectReadChannel(node.size(), (start, end) -> store.openRange(key, start, end), completion);
+      if("OUTBOX".equals(node.kind()) && !Boolean.TRUE.equals(session.account.getValueBoolean("pgpEncryptDownloads")))
+      {
+         channel.withFullDownload((bytes, failed) ->
+         {
+            try
+            {
+               outbox.downloaded(node.job());
+            }
+            catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+            {
+               throw (new IOException("Unable to acknowledge outbox download", e));
+            }
+         });
+      }
+      return (channel);
    }
 
 
@@ -475,7 +741,7 @@ public class VirtualTree
          audit.insert(FileGatewayTables.TRANSFER_LOG, new QRecord().withValue("accountId", session.account.getValue("id"))
             .withValue("connectionLogId", session.connectionId).withValue("operation", "DOWNLOAD").withValue("path", node.path())
             .withValue("objectKind", "SIDECAR".equals(node.kind()) ? "RESULT" : node.kind()).withValue("objectId", node.objectId())
-            .withValue("uploadJobId", node.job().getValue("id")).withValue("bytes", bytes)
+            .withValue("uploadJobId", "OUTBOX".equals(node.kind()) ? null : node.job().getValue("id")).withValue("bytes", bytes)
             .withValue("sha256", "ARCHIVE".equals(node.kind()) ? node.job().getValue("sha256") : null)
             .withValue("durationMs", (System.nanoTime() - began) / 1_000_000).withValue("outcome", failed ? "ERROR" : "OK")
             .withValue("clientChannel", "sftp/" + session.id));
@@ -494,6 +760,19 @@ public class VirtualTree
    public void remove(String path) throws IOException
    {
       Node node = stat(path);
+      if("OUTBOX".equals(node.kind()) && outbox != null)
+      {
+         try
+         {
+            outbox.remove(node.job());
+            log(path, "REMOVE", "OK", null, System.nanoTime());
+            return;
+         }
+         catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+         {
+            throw (new IOException("Unable to remove outbox file", e));
+         }
+      }
       if(node.job() == null || !List.of("SIDECAR", "RESULT").contains(node.kind()))
       {
          deny(path, "REMOVE", "Only sidecars and results can be acknowledged");

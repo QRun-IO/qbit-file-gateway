@@ -115,17 +115,28 @@ public class AuditWriter
     *******************************************************************************/
    public <T> T withAccountLock(String field, Serializable value, Work<T> work) throws QException
    {
+      return (withRowLock(FileGatewayTables.ACCOUNT, field, value, work));
+   }
+
+
+
+   /*******************************************************************************
+    ** Serialize transitions on one gateway-owned row across gateway and web pods.
+    *******************************************************************************/
+   public <T> T withRowLock(String table, String field, Serializable value, Work<T> work) throws QException
+   {
+      checkTable(table);
       return (system(() ->
       {
-         try(var tx = QBackendTransaction.openFor(new QueryInput(FileGatewayTables.ACCOUNT)))
+         try(var tx = QBackendTransaction.openFor(new QueryInput(table)))
          {
             transaction.set(tx);
             try
             {
-               var rows = query(FileGatewayTables.ACCOUNT, new QQueryFilter(new QFilterCriteria(field, QCriteriaOperator.EQUALS, value)));
+               var rows = query(table, new QQueryFilter(new QFilterCriteria(field, QCriteriaOperator.EQUALS, value)));
                if(!rows.isEmpty())
                {
-                  update(FileGatewayTables.ACCOUNT, new QRecord().withValue("id", rows.getFirst().getValue("id")).withValue("modifyDate", Instant.now()));
+                  update(table, new QRecord().withValue("id", rows.getFirst().getValue("id")).withValue("modifyDate", Instant.now()));
                }
                T result = work.run();
                tx.commit();
@@ -216,6 +227,18 @@ public class AuditWriter
       checkTable(table);
       QRecord result = system(() -> new UpdateAction().execute(new UpdateInput(table).withRecords(List.of(record)).withTransaction(transaction.get())).getRecords().get(0));
       checkErrors(result);
+   }
+
+
+
+   /*******************************************************************************
+    ** Retention deletes only gateway-owned rows under the bookkeeping session.
+    *******************************************************************************/
+   public void delete(String table, Serializable id) throws QException
+   {
+      checkTable(table);
+      system(() -> new com.kingsrook.qqq.backend.core.actions.tables.DeleteAction().execute(
+         new com.kingsrook.qqq.backend.core.model.actions.tables.delete.DeleteInput(table).withPrimaryKey(id).withTransaction(transaction.get())));
    }
 
 

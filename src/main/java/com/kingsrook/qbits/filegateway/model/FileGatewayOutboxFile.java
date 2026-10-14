@@ -79,6 +79,10 @@ public class FileGatewayOutboxFile extends QRecordEntity
 
 
 
+   @QField
+   private Boolean onDownloadedPending;
+
+
    /*******************************************************************************
     ** Create an empty entity.
     *******************************************************************************/
@@ -528,5 +532,36 @@ public class FileGatewayOutboxFile extends QRecordEntity
    public void setCreatedByConsumer(String createdByConsumer)
    {
       this.createdByConsumer = createdByConsumer;
+   }
+
+
+
+   /*******************************************************************************
+    ** Getter for onDownloadedPending.
+    *******************************************************************************/
+   public Boolean getOnDownloadedPending()
+   {
+      return (onDownloadedPending);
+   }
+
+
+
+   /*******************************************************************************
+    ** Setter used by QRecordEntity population.
+    *******************************************************************************/
+   public void setOnDownloadedPending(Boolean onDownloadedPending)
+   {
+      this.onDownloadedPending = onDownloadedPending;
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for onDownloadedPending.
+    *******************************************************************************/
+   public FileGatewayOutboxFile withOnDownloadedPending(Boolean onDownloadedPending)
+   {
+      this.onDownloadedPending = onDownloadedPending;
+      return (this);
    }
 }

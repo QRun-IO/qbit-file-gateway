@@ -66,6 +66,16 @@ public class UploadJobs
     *******************************************************************************/
    public SeekableByteChannel receive(GatewaySession session, String path, String table, Integer profile) throws IOException
    {
+      return (receive(session, path, table, profile, null));
+   }
+
+
+
+   /*******************************************************************************
+    ** Persist the resolved endpoint with the upload before any bytes are accepted.
+    *******************************************************************************/
+   public SeekableByteChannel receive(GatewaySession session, String path, String table, Integer profile, QRecord alias) throws IOException
+   {
       String name = path.substring(path.lastIndexOf('/') + 1);
       if(name.isBlank() || name.contains(":") || name.contains("\\") || name.chars().anyMatch(Character::isISOControl))
       {
@@ -82,7 +92,8 @@ public class UploadJobs
          QRecord job = audit.insert(FileGatewayTables.UPLOAD_JOB, new QRecord()
             .withValue("accountId", session.account.getValue("id")).withValue("connectionLogId", session.connectionId)
             .withValue("remoteAddress", session.remoteIp).withValue("tableName", table).withValue("savedBulkLoadProfileId", profile)
-            .withValue("consumerName", "bulk-load").withValue("path", path).withValue("fileName", name).withValue("storageKey", key)
+            .withValue("aliasId", alias == null ? null : alias.getValue("id"))
+            .withValue("consumerName", alias != null && "INBOX".equals(alias.getValueString("kind")) ? alias.getValueString("consumerName") : "bulk-load").withValue("path", path).withValue("fileName", name).withValue("storageKey", key)
             .withValue("status", "RECEIVING").withValue("sizeBytes", 0L).withValue("attempts", 0).withValue("createDate", clock.instant()));
          long started = System.nanoTime();
          return (new UploadChannel(store, key, Math.toIntExact(config.getUploadPartSizeMb() * MIB), config.getUploadReorderWindowMb() * MIB, new UploadChannel.Lifecycle()

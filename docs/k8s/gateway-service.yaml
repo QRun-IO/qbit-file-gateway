@@ -1,0 +1,20 @@
+# qbit-file-gateway: the SFTP LoadBalancer Service (docs/DESIGN.md section 11).
+# One port only: v1 is SFTP only, so there is no FTPS passive port range (see DESIGN.md section 15).
+apiVersion: v1
+kind: Service
+metadata:
+  name: <APP>-file-gateway
+  annotations:
+    # Cilium LB-IPAM: a fixed address (kof22 on k8s-galaxy: 10.100.22.65, owner decision 2026-10-13).
+    # Cilium 1.15+ reads lbipam.cilium.io/ips; older clusters (and k8s-galaxy manifests) use io.cilium/lb-ipam-ips.
+    lbipam.cilium.io/ips: "10.100.22.65"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local   # keep the client IP: IP allowlists and lockouts need it
+  selector:
+    app.kubernetes.io/name: <APP>-file-gateway
+  ports:
+    - name: sftp
+      port: 22
+      targetPort: sftp
+      protocol: TCP

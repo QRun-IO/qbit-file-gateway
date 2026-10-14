@@ -34,6 +34,8 @@ import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
  *******************************************************************************/
 public class FileGatewayQBitConfig implements QBitConfig
 {
+   private String schedulerName = null;
+   private Duration serverRetention = Duration.ofDays(1);
    private String backendName = "rdbms";
    private boolean sftpEnabled = false;
    private int sftpPort = 2222;
@@ -738,4 +740,49 @@ public class FileGatewayQBitConfig implements QBitConfig
       this.tableMetaDataCustomizer = tableMetaDataCustomizer;
       return (this);
    }
+
+
+
+   /*******************************************************************************
+    ** Getter for schedulerName.
+    *******************************************************************************/
+   public String getSchedulerName()
+   {
+      return (schedulerName);
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for schedulerName.
+    *******************************************************************************/
+   public FileGatewayQBitConfig withSchedulerName(String schedulerName)
+   {
+      this.schedulerName = schedulerName;
+      return (this);
+   }
+
+
+
+   /*******************************************************************************
+    ** Getter for serverRetention.
+    *******************************************************************************/
+   public Duration getServerRetention()
+   {
+      return (serverRetention);
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for serverRetention.
+    *******************************************************************************/
+   public FileGatewayQBitConfig withServerRetention(Duration serverRetention)
+   {
+      this.serverRetention = serverRetention;
+      return (this);
+   }
+
+
+
 }

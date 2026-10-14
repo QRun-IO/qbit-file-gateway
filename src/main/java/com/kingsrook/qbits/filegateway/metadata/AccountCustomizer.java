@@ -44,6 +44,27 @@ public class AccountCustomizer implements TableCustomizerInterface
          {
             record.addError(new BadInputStatusMessage("Username must be 3 to 64 lowercase letters, digits, dots, underscores or hyphens"));
          }
+         if(oldRecords.isEmpty() && record.getValue("rootMode") == null)
+         {
+            record.setValue("rootMode", "SERVICE".equals(record.getValueString("accountType")) ? "ENDPOINTS_ONLY" : "FULL_TREE");
+         }
+         String pgpKey = record.getValueString("pgpPublicKey");
+         if(pgpKey != null && !pgpKey.isBlank())
+         {
+            try
+            {
+               com.kingsrook.qbits.filegateway.pgp.PgpStreams.encryptionKey(pgpKey);
+            }
+            catch(Exception e)
+            {
+               record.addError(new BadInputStatusMessage("PGP public key must parse and contain a valid encryption subkey"));
+            }
+         }
+         if(Boolean.TRUE.equals(record.getValueBoolean("pgpEncryptDownloads")) && (pgpKey == null || pgpKey.isBlank())
+            && oldRecords.orElse(List.of()).stream().noneMatch(old -> java.util.Objects.equals(old.getValue("id"), record.getValue("id")) && old.getValueString("pgpPublicKey") != null))
+         {
+            record.addError(new BadInputStatusMessage("PGP download encryption requires a public key"));
+         }
          for(String limit : List.of("maxConcurrentSessions", "maxOperationsPerMinute", "maxFileSizeMb", "maxUploadMbPerDay", "maxDownloadMbPerDay"))
          {
             if(record.getValueInteger(limit) != null && record.getValueInteger(limit) < 1)

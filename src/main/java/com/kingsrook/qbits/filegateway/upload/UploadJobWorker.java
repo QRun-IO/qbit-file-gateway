@@ -63,6 +63,7 @@ public class UploadJobWorker implements AutoCloseable
    private final AuditWriter audit;
    private final Clock clock;
    private final String pod;
+   private java.util.function.Function<String, String> environment = System::getenv;
    private volatile boolean stopped;
    private ScheduledExecutorService pool;
 
@@ -79,6 +80,17 @@ public class UploadJobWorker implements AutoCloseable
       this.pod = pod == null ? java.util.UUID.randomUUID().toString() : pod;
       audit = new AuditWriter(instance);
    }
+
+   /*******************************************************************************
+    ** Share the host-key environment seam; secret values are never persisted or logged.
+    *******************************************************************************/
+   public UploadJobWorker withEnvironment(java.util.function.Function<String, String> environment)
+   {
+      this.environment = environment;
+      return (this);
+   }
+
+
 
    /*******************************************************************************
     ** Each scheduled lane handles one job at a time, without an unbounded work queue.
@@ -222,6 +234,19 @@ public class UploadJobWorker implements AutoCloseable
                   return;
                }
             }
+            if(Boolean.TRUE.equals(account.getValueBoolean("pgpDecryptUploads")) && job.getValueString("fileName").toLowerCase(java.util.Locale.ROOT).matches(".*[.](pgp|gpg)$"))
+            {
+               try
+               {
+                  decrypt(job, account);
+                  file = inbound(job, account);
+               }
+               catch(Exception e)
+               {
+                  finish(job, new QRecord().withValue("status", "REJECTED").withValue("errorMessage", "PGP decryption failed: invalid ciphertext, key, integrity or size limit"), account);
+                  return;
+               }
+            }
             FileGatewayConsumer consumer = consumer(job, user);
             if(consumer == null)
             {
@@ -252,6 +277,44 @@ public class UploadJobWorker implements AutoCloseable
    }
 
    /*******************************************************************************
+    ** Keep the original for the archive and persist authenticated plaintext for retries.
+    *******************************************************************************/
+   private void decrypt(QRecord job, QRecord account) throws IOException, QException
+   {
+      if(job.getValue("plaintextStorageKey") != null)
+      {
+         return;
+      }
+      String key = "file-gateway/plaintext/" + job.getValue("id") + "/" + java.util.UUID.randomUUID();
+      String pass = config.getPgpPassphraseEnvVarName() == null ? null : environment.apply(config.getPgpPassphraseEnvVarName());
+      char[] password = pass == null ? new char[0] : pass.toCharArray();
+      try(var source = store.open(job.getValueString("storageKey"));
+         var plaintext = com.kingsrook.qbits.filegateway.pgp.PgpStreams.decrypt(source,
+            config.getPgpPrivateKeyEnvVarName() == null ? null : environment.apply(config.getPgpPrivateKeyEnvVarName()), password,
+            (account.getValueInteger("maxFileSizeMb") == null ? config.getDefaultMaxFileSizeMb() : account.getValueInteger("maxFileSizeMb")) * UploadJobs.MIB))
+      {
+         var receipt = store.put(key, plaintext);
+         QRecord changes = new QRecord().withValue("plaintextStorageKey", key).withValue("plaintextSha256", receipt.sha256()).withValue("plaintextSizeBytes", receipt.size());
+         if(!persistOwned(job, changes))
+         {
+            throw (new IOException("Upload claim expired during PGP decryption"));
+         }
+         job.getValues().putAll(changes.getValues());
+      }
+      catch(Exception e)
+      {
+         store.delete(key);
+         throw (new IOException("PGP decryption failed", e));
+      }
+      finally
+      {
+         java.util.Arrays.fill(password, '\0');
+      }
+   }
+
+
+
+   /*******************************************************************************
     ** Registry lookup is by declared name, with the built-in bulk-load consumer reserved.
     *******************************************************************************/
    private FileGatewayConsumer consumer(QRecord job, WorkerUserSession user)
@@ -275,15 +338,24 @@ public class UploadJobWorker implements AutoCloseable
    /*******************************************************************************
     ** Immutable delivery envelope; each openStream gets an independent object stream.
     *******************************************************************************/
-   private InboundFile inbound(QRecord job, QRecord account)
+   private InboundFile inbound(QRecord job, QRecord account) throws QException
    {
-      return (new InboundFile(job.getValueInteger("id"), null, account.getValueString("username"), account.getValueString("userId"),
-         job.getValueString("remoteAddress"), job.getValueString("path"), job.getValueString("fileName"), job.getValueLong("sizeBytes"),
-         job.getValueString("sha256"), job.getValueInstant("createDate"), config.getFileGatewayBucketAlias(), job.getValueString("storageKey"), () ->
+      String endpointName = job.getValue("aliasId") == null ? null
+         : audit.query(FileGatewayTables.ALIAS, UploadJobs.equal("id", job.getValue("aliasId"))).getFirst().getValueString("name");
+      boolean plaintext = job.getValue("plaintextStorageKey") != null;
+      String storageKey = job.getValueString(plaintext ? "plaintextStorageKey" : "storageKey");
+      String filename = job.getValueString("fileName");
+      if(plaintext)
+      {
+         filename = filename.substring(0, filename.length() - 4);
+      }
+      return (new InboundFile(job.getValueInteger("id"), endpointName, account.getValueString("username"), account.getValueString("userId"),
+         job.getValueString("remoteAddress"), job.getValueString("path"), filename, job.getValueLong(plaintext ? "plaintextSizeBytes" : "sizeBytes"),
+         job.getValueString(plaintext ? "plaintextSha256" : "sha256"), job.getValueInstant("createDate"), config.getFileGatewayBucketAlias(), storageKey, () ->
          {
             try
             {
-               return (store.open(job.getValueString("storageKey")));
+               return (store.open(storageKey));
             }
             catch(IOException e)
             {

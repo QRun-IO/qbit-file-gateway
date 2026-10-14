@@ -74,6 +74,11 @@
 
    <dependencies>
       <dependency>
+         <groupId>org.bouncycastle</groupId>
+         <artifactId>bcpg-jdk18on</artifactId>
+         <version>1.84</version>
+      </dependency>
+      <dependency>
          <groupId>com.kingsrook.qbits</groupId>
          <artifactId>qbit-object-storage</artifactId>
          <version>0.1.0-RC.2</version>

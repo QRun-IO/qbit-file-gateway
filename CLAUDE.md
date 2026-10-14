@@ -60,11 +60,17 @@ Saved-view JSON uses `queryFilter.orderBys` and `queryColumns.columns` visibilit
 stat size is zero; reads fill requests until real EOF to avoid MINA's short-read EOF inference.
 Reports list only with a configured render-process storage table. FieldSecurityLock DENY tests
 require `enforcePermissionsInCoreActions=true` and match direct same-user UI export bytes.
-Core `RenderSavedReportExecuteStep` currently uses a temporary file; fully disk-free report
-rendering is a core follow-up, and the snapshot guard cannot detect transient files.
-Endpoint routing/chroot, outbox delivery, Quick Search/ESB,
-preferences, retention and the app home belong to later phases. The core-valid alert type is `filegateway.lockout`; the design's
-underscore-only name is rejected by core validation.
+Core `RenderSavedReportExecuteStep` stages a rendered report in a JVM temp file and deletes it
+in try-with-resources; that is the bounded temp area the owner rule allows (in-memory `/tmp`).
+The core-valid alert type is `filegateway.lockout` (dotted names only).
+
+Phase (e) adds endpoints and chroot (`AliasCustomizer` validates paths), `outbox/` (the
+`FileGatewayOutboxProvider`, registered in every deployment), `pgp/` (BouncyCastle stream
+decrypt/encrypt, keys in memory), `maintenance/` (daily retention process and record-action
+effects), `FileGatewayHome` (typed STATISTICS and TABLE widgets only; guardrail G5),
+`FileGatewayIntegrations` (ESB, Quick Search, API lists) and `file_gateway_server` heartbeats.
+The Preferences "File transfer" section waits for QRun-IO/qqq#1162. The k8s example is in
+`docs/k8s/`.
 
 Tests run a strict UI API server, H2 from the adopter DDL and real MINA clients. NoDiskExtension
 snapshots the working tree (excluding target) and isolated test home, and asserts the test temp

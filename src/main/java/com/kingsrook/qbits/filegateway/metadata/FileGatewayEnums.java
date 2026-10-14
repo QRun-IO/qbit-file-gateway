@@ -73,7 +73,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -112,7 +112,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -151,7 +151,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -190,7 +190,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -229,7 +229,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -268,7 +268,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -307,7 +307,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -346,7 +346,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -385,7 +385,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -424,7 +424,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -463,7 +463,7 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
    }
 
@@ -502,7 +502,18 @@ public final class FileGatewayEnums
       @Override
       public String getPossibleValueLabel()
       {
-         return (value);
+         return (label(value));
       }
+   }
+
+
+
+   /*******************************************************************************
+    ** Plain label for a persisted value: ENDPOINTS_ONLY becomes "Endpoints only".
+    *******************************************************************************/
+   static String label(String value)
+   {
+      String words = value.replace('_', ' ').toLowerCase();
+      return (Character.toUpperCase(words.charAt(0)) + words.substring(1));
    }
 }

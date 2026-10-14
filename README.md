@@ -263,8 +263,64 @@ The isolated `com.kingsrook.qbits.filegateway.api` package contains `FileGateway
 `InboundFile` (including remote address and a fresh stream supplier), `FileAcceptance`,
 `OutboxFileRef`, and the consumer metadata registry. `FileGatewayOutbox` delegates to a registered
 `FileGatewayOutboxProvider`; without one it reports unavailable and throws
-`FileGatewayUnavailableException`. The consumer pipeline is active in phase (b); endpoint binding
-and the outbox provider remain phase (e).
+`FileGatewayUnavailableException`. INBOX endpoints bind a consumer by `consumer_name`; the built-in
+`bulk-load` consumer serves `upload/<profile>/` folders and BULK_LOAD endpoints. The outbox
+provider is registered by the producer in every deployment (it needs only the database and object
+storage), so other qbits can call `FileGatewayOutbox.put(...)` from web pods too.
+
+## Endpoints and chroot
+
+`file_gateway_alias` rows ("Endpoints") mount partner-friendly paths such as `/acme/orders-in`:
+
+| Kind | Behaviour |
+|---|---|
+| `BULK_LOAD` | upload folder that bulk-loads with the endpoint's saved profile |
+| `INBOX` | upload folder whose files go to the `consumer_name` consumer |
+| `VIEW`, `REPORT` | one generated file (`file_name`, or `<slug>.<format>`) |
+| `OUTBOX` | files put by `FileGatewayOutbox`; partners download and delete them |
+
+Paths are absolute, `[a-z0-9._/-]`, unique, and never collide with app names. An endpoint is
+listed only when it is active, bound to the account (or shared), and its target is reachable by
+the user through `/qqq/v1`; endpoints grant nothing. `root_mode` FULL_TREE (default for users)
+shows the app tree plus endpoints; ENDPOINTS_ONLY (default for service accounts) is the chroot.
+
+## Outbox
+
+`put` streams to `file-gateway/outbox/{aliasId}/{uuid}/{fileName}` with a SHA-256 and a
+`file_gateway_outbox_file` row (READY). The first complete download marks it DOWNLOADED and calls
+`onDownloaded` on the endpoint's consumer (at-least-once); `rm` marks it REMOVED; retention marks
+old files EXPIRED and deletes the object.
+
+## PGP (optional, per account)
+
+`pgp_decrypt_uploads`: uploads named `*.pgp`/`*.gpg` are decrypted stream to stream into a new
+object before the consumer runs, with the key and passphrase from the env vars named by
+`pgpPrivateKeyEnvVarName`/`pgpPassphraseEnvVarName` (in memory only); a bad file is REJECTED.
+`pgp_encrypt_downloads`: downloads are encrypted on the fly to the account's `pgp_public_key`
+(validated on save) and listed with `.pgp` appended.
+
+## App home, actions and retention
+
+The `file_gateway` app home uses typed widgets only: a KPI row (transfers today, failed jobs in
+24 hours, active sessions, MB in and out today, locked accounts), and full-width tables for recent
+failures, top partners (7 days), active sessions and gateway servers (host key fingerprint, port,
+pod, last seen, from `file_gateway_server` heartbeats). Record actions (standard Review/Result,
+never in the nav): Unlock account, Disable account, Revoke key, End session, Retry upload. A daily
+scheduled retention process applies the `*Retention` settings and aborts stale RECEIVING uploads.
+
+## Integrations
+
+`FileGatewayIntegrations` lists what a host wires in without this qbit depending on those modules:
+`esbTableNames()` (accounts, endpoints, upload jobs), `quickSearchTables()` (accounts by username
+and label, endpoints by name and path, upload jobs by file name) and `apiTableNames()` (all tables,
+with the admin's rules).
+
+## Kubernetes
+
+`docs/k8s/gateway-deployment.yaml` and `docs/k8s/gateway-service.yaml`: the same image as the web
+Deployment with `FILE_GATEWAY_SFTP_ENABLED=true`, the host key from a Secret, a read-only root
+filesystem with an in-memory `/tmp`, 2 replicas and a PDB, and a LoadBalancer Service exposing
+port 22 only (no passive range: v1 is SFTP only) with `externalTrafficPolicy: Local`.
 
 ## Build and acceptance tests
 

@@ -136,6 +136,16 @@ public class FileGatewayUploadJob extends QRecordEntity
 
 
 
+   @QField
+   private String plaintextStorageKey;
+
+   @QField
+   private String plaintextSha256;
+
+   @QField
+   private Long plaintextSizeBytes;
+
+
    /*******************************************************************************
     ** Create an empty entity.
     *******************************************************************************/
@@ -1170,4 +1180,97 @@ public class FileGatewayUploadJob extends QRecordEntity
       return (this);
    }
 
+
+
+
+   /*******************************************************************************
+    ** Getter for plaintextStorageKey.
+    *******************************************************************************/
+   public String getPlaintextStorageKey()
+   {
+      return (plaintextStorageKey);
+   }
+
+
+
+   /*******************************************************************************
+    ** Setter used by QRecordEntity population.
+    *******************************************************************************/
+   public void setPlaintextStorageKey(String plaintextStorageKey)
+   {
+      this.plaintextStorageKey = plaintextStorageKey;
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for plaintextStorageKey.
+    *******************************************************************************/
+   public FileGatewayUploadJob withPlaintextStorageKey(String plaintextStorageKey)
+   {
+      this.plaintextStorageKey = plaintextStorageKey;
+      return (this);
+   }
+
+
+
+   /*******************************************************************************
+    ** Getter for plaintextSha256.
+    *******************************************************************************/
+   public String getPlaintextSha256()
+   {
+      return (plaintextSha256);
+   }
+
+
+
+   /*******************************************************************************
+    ** Setter used by QRecordEntity population.
+    *******************************************************************************/
+   public void setPlaintextSha256(String plaintextSha256)
+   {
+      this.plaintextSha256 = plaintextSha256;
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for plaintextSha256.
+    *******************************************************************************/
+   public FileGatewayUploadJob withPlaintextSha256(String plaintextSha256)
+   {
+      this.plaintextSha256 = plaintextSha256;
+      return (this);
+   }
+
+
+
+   /*******************************************************************************
+    ** Getter for plaintextSizeBytes.
+    *******************************************************************************/
+   public Long getPlaintextSizeBytes()
+   {
+      return (plaintextSizeBytes);
+   }
+
+
+
+   /*******************************************************************************
+    ** Setter used by QRecordEntity population.
+    *******************************************************************************/
+   public void setPlaintextSizeBytes(Long plaintextSizeBytes)
+   {
+      this.plaintextSizeBytes = plaintextSizeBytes;
+   }
+
+
+
+   /*******************************************************************************
+    ** Fluent setter for plaintextSizeBytes.
+    *******************************************************************************/
+   public FileGatewayUploadJob withPlaintextSizeBytes(Long plaintextSizeBytes)
+   {
+      this.plaintextSizeBytes = plaintextSizeBytes;
+      return (this);
+   }
 }

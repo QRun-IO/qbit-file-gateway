@@ -229,7 +229,7 @@ public final class FileGatewayProcesses
                case END_SESSION ->
                {
                   table = FileGatewayTables.CONNECTION_LOG;
-                  update.withValue("disconnectedAt", Instant.now()).withValue("disconnectReason", "Ended by administrator");
+                  update.withValue("endRequestedAt", Instant.now()).withValue("disconnectReason", "Ended by administrator");
                }
                default -> throw (new QException("Unsupported gateway action"));
             }

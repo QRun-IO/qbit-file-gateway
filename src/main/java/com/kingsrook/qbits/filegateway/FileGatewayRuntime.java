@@ -86,6 +86,7 @@ public final class FileGatewayRuntime implements AutoCloseable
          return (null);
       }
       FileGatewayRuntime runtime = new FileGatewayRuntime(instance, server, config, hostKey(config, environment), Clock.systemUTC(), Duration.ofSeconds(60), environment.apply("HOSTNAME"), new ObjectStorageGatewayStore(instance, config.getFileGatewayBucketAlias()));
+      runtime.worker.withEnvironment(environment);
       runtime.protocol.start();
       runtime.worker.start(Duration.ofSeconds(60));
       return (runtime);
