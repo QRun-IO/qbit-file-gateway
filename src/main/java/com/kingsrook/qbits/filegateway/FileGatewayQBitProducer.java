@@ -29,6 +29,7 @@ import com.kingsrook.qqq.backend.core.alerts.QAlertTypeMetaData;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.model.metadata.MetaDataProducerMultiOutput;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
+import com.kingsrook.qqq.backend.core.model.metadata.fields.QFieldMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppSection;
 import com.kingsrook.qqq.backend.core.model.metadata.layout.QIcon;
@@ -43,6 +44,9 @@ import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
  *******************************************************************************/
 public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGatewayQBitConfig>
 {
+   /** Core possible-value sources a host may or may not register. */
+   static final java.util.Set<String> OPTIONAL_HOST_SOURCES = java.util.Set.of("savedView", "savedReport", "savedBulkLoadProfile");
+
    /*******************************************************************************
     ** The sftp wall owns its list (core's qbit prefixes are transitional and the
     ** assistant may now read audits): partners never reach identity, audits,
@@ -149,6 +153,7 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
             table = qBitConfig.getTableMetaDataCustomizer().customizeMetaData(qInstance, table);
          }
          table.setSourceQBitName(qBit.getName());
+         dropMissingPickers(qInstance, table);
          output.add(table);
          if(FileGatewayTables.MAIN.contains(table.getName()))
          {
@@ -186,5 +191,26 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
       com.kingsrook.qbits.filegateway.api.FileGatewayOutbox.setProvider(new com.kingsrook.qbits.filegateway.outbox.OutboxService(qInstance,
          new com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore(qInstance, qBitConfig.getFileGatewayBucketAlias()), qBitConfig, java.time.Clock.systemUTC()));
       return (new MetaDataProducerMultiOutput());
+   }
+
+
+
+   /*******************************************************************************
+    ** Saved views, saved reports and saved bulk-load profiles are optional in a
+    ** host. A picker whose possible-value source the host has not registered (yet)
+    ** stays a plain id field, so the instance validates; register those core
+    ** metadata providers before this producer to get the pickers.
+    *******************************************************************************/
+   static void dropMissingPickers(QInstance qInstance, QTableMetaData table)
+   {
+      for(QFieldMetaData field : table.getFields().values())
+      {
+         String source = field.getPossibleValueSourceName();
+         if(source != null && OPTIONAL_HOST_SOURCES.contains(source) && qInstance.getPossibleValueSource(source) == null)
+         {
+            field.setPossibleValueSourceName(null);
+            field.setPossibleValueSourceFilter(null);
+         }
+      }
    }
 }

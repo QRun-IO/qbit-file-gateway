@@ -170,7 +170,7 @@ public class FileGatewayHome extends AbstractWidgetRenderer
       List<TableData.Column> columns = new ArrayList<>();
       for(int i = 0; i < fields.size(); i++)
       {
-         columns.add(new TableData.Column(i == 0 ? "block" : "default", labels.get(i), fields.get(i), "1fr", null));
+         columns.add(new TableData.Column(i == 0 ? "block" : "default", labels.get(i), fields.get(i), null, null));
       }
       List<Map<String, Object>> rows = new ArrayList<>();
       for(QRecord record : records)
