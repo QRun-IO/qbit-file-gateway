@@ -110,7 +110,7 @@ class SftpIntegrationTest
             assertThat(names(ca, "/testapp/alpha/reports")).contains("daily-orders.csv", "daily-orders.xlsx");
             assertThat(ca.stat("/testapp/alpha/views/all-orders.csv").getSize()).isZero();
             assertThatThrownBy(() -> ca.read("/testapp/alpha/views/all-orders.csv")).isInstanceOf(SftpException.class);
-            assertThatThrownBy(() -> ca.write("/testapp/alpha/upload/orders-in/test.csv")).isInstanceOf(SftpException.class);
+            assertThatThrownBy(() -> ca.write("/testapp/alpha/test.csv")).isInstanceOf(SftpException.class);
             assertThatThrownBy(() -> ca.setStat("/testapp/alpha/views/all-orders.csv", new SftpClient.Attributes().modifyTime(0))).isInstanceOfSatisfying(SftpException.class,
                e -> assertThat(e.getStatus()).isEqualTo(SftpConstants.SSH_FX_PERMISSION_DENIED));
             assertThatThrownBy(() -> names(cb, "/testapp/alpha")).isInstanceOf(java.io.UncheckedIOException.class).hasCauseInstanceOf(SftpException.class);

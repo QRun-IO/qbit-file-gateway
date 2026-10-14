@@ -30,7 +30,7 @@ import java.util.Set;
 
 
 /*******************************************************************************
- ** Virtual attributes: generated files have size zero and read-only permissions.
+ ** Virtual attributes: generated exports have size zero; stored objects report persisted size.
  *******************************************************************************/
 public record GatewayFileAttributes(VirtualTree.Node node, FileTime time) implements PosixFileAttributes
 {
@@ -120,7 +120,7 @@ public record GatewayFileAttributes(VirtualTree.Node node, FileTime time) implem
    @Override
    public long size()
    {
-      return (0);
+      return (node.size());
    }
 
 
@@ -164,6 +164,10 @@ public record GatewayFileAttributes(VirtualTree.Node node, FileTime time) implem
    @Override
    public Set<PosixFilePermission> permissions()
    {
+      if(node.directory() && "PROFILE".equals(node.kind()) && node.objectId() != null)
+      {
+         return (Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE));
+      }
       return (node.directory() ? Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE) : Set.of(PosixFilePermission.OWNER_READ));
    }
 }

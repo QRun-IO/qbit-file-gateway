@@ -92,6 +92,7 @@ CREATE TABLE file_gateway_upload_job (
    error_count INTEGER,
    result_summary TEXT,
    results_storage_key VARCHAR(1024),
+   results_size_bytes BIGINT,
    error_message TEXT,
    attempts INTEGER,
    next_attempt_at TIMESTAMP,

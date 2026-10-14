@@ -108,7 +108,7 @@ public class GatewayFileSystem extends FileSystem
    @Override
    public boolean isReadOnly()
    {
-      return (true);
+      return (false);
    }
 
 

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import com.kingsrook.qbits.filegateway.permissions.FileGatewayPermissions;
 import com.kingsrook.qbits.filegateway.sftp.AuditWriter;
+import com.kingsrook.qbits.filegateway.upload.UploadJobs;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.exceptions.QPermissionDeniedException;
@@ -49,6 +50,7 @@ import com.kingsrook.qqq.backend.core.processes.implementations.etl.streamedwith
  *******************************************************************************/
 public final class FileGatewayProcesses
 {
+   public static final String RETRY_UPLOAD = "file_gateway_retry_upload";
    public static final String UNLOCK = "file_gateway_unlock_account";
    public static final String DISABLE = "file_gateway_disable_account";
    public static final String REVOKE = "file_gateway_revoke_key";
@@ -64,14 +66,15 @@ public final class FileGatewayProcesses
 
 
    /*******************************************************************************
-    ** Phase-a actions; retrying uploads belongs to the phase-b job worker.
+    ** Administrative actions bound to their owning tables.
     *******************************************************************************/
    public static List<QProcessMetaData> processes()
    {
       return (List.of(action(UNLOCK, "Unlock account", FileGatewayTables.ACCOUNT),
          action(DISABLE, "Disable account", FileGatewayTables.ACCOUNT),
          action(REVOKE, "Revoke key", FileGatewayTables.SSH_KEY),
-         action(END_SESSION, "End session", FileGatewayTables.CONNECTION_LOG)));
+         action(END_SESSION, "End session", FileGatewayTables.CONNECTION_LOG),
+         action(RETRY_UPLOAD, "Retry upload", FileGatewayTables.UPLOAD_JOB)));
    }
 
 
@@ -112,6 +115,7 @@ public final class FileGatewayProcesses
    public static class Review extends AbstractTransformStep implements ProcessSummaryProviderInterface
    {
       private final ProcessSummaryLine summary = new ProcessSummaryLine(Status.OK, 0, null);
+      private final ProcessSummaryLine skipped = new ProcessSummaryLine(Status.INFO, 0, "uploads are not eligible for retry");
 
       /*******************************************************************************
        ** Review uses the framework's future and past tense summary lines.
@@ -135,6 +139,12 @@ public final class FileGatewayProcesses
          requireAdmin();
          for(QRecord record : input.getRecords())
          {
+            if(RETRY_UPLOAD.equals(input.getProcessName()) && (!List.of("FAILED", "REJECTED").contains(record.getValueString("status"))
+               || record.getValueString("storageKey") == null || record.getValueString("sha256") == null))
+            {
+               skipped.incrementCountAndAddPrimaryKey(record.getValue("id"));
+               continue;
+            }
             summary.incrementCountAndAddPrimaryKey(record.getValue("id"));
             output.getRecords().add(record);
          }
@@ -148,7 +158,9 @@ public final class FileGatewayProcesses
       @Override
       public ArrayList<ProcessSummaryLineInterface> getProcessSummary(RunBackendStepOutput output, boolean result)
       {
-         return (new ArrayList<>(List.of(summary)));
+         ArrayList<ProcessSummaryLineInterface> lines = new ArrayList<>(List.of(summary));
+         skipped.addSelfToListIfAnyCount(lines);
+         return (lines);
       }
    }
 
@@ -169,6 +181,28 @@ public final class FileGatewayProcesses
          AuditWriter audit = new AuditWriter(QContext.getQInstance());
          for(QRecord record : input.getRecords())
          {
+            if(RETRY_UPLOAD.equals(input.getProcessName()))
+            {
+               audit.withAccountLock("id", record.getValue("accountId"), () ->
+               {
+                  QRecord current = audit.query(FileGatewayTables.UPLOAD_JOB, UploadJobs.equal("id", record.getValue("id"))).getFirst();
+                  if(!List.of("FAILED", "REJECTED").contains(current.getValueString("status"))
+                     || current.getValueString("storageKey") == null || current.getValueString("sha256") == null)
+                  {
+                     throw (new QException("Only failed or rejected stored uploads can be retried"));
+                  }
+                  QRecord retry = new QRecord().withValue("id", record.getValue("id"))
+                     .withValue("status", "QUEUED").withValue("attempts", 0).withValue("nextAttemptAt", null)
+                     .withValue("claimedBy", null).withValue("claimedAt", null).withValue("finishedAt", null)
+                     .withValue("acknowledgedAt", null).withValue("errorMessage", null).withValue("resultSummary", null)
+                     .withValue("resultsStorageKey", null).withValue("resultsSizeBytes", null).withValue("processUuid", null)
+                     .withValue("insertedCount", null).withValue("errorCount", null).withValue("queuedAt", Instant.now());
+                  audit.update(FileGatewayTables.UPLOAD_JOB, retry);
+                  output.getRecords().add(retry);
+                  return (null);
+               });
+               continue;
+            }
             QRecord update = new QRecord().withValue("id", record.getValue("id"));
             String table;
             switch(input.getProcessName())
