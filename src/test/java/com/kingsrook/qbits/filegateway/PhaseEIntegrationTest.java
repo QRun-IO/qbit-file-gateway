@@ -278,6 +278,14 @@ class PhaseEIntegrationTest
          // readable at all widths: home tables declare no column widths //
          //////////////////////////////////////////////////////////////////
          assertThat(((TableData) home.data("recent", now)).getColumns()).allSatisfy(column -> assertThat(column.getWidth()).isNull());
+         for(String key : List.of("recent", "partners", "active", "servers"))
+         {
+            ////////////////////////////////////////////////////////////////////////
+            // at most four columns, so tables stay readable at phone widths     //
+            ////////////////////////////////////////////////////////////////////////
+            assertThat(((TableData) home.data(key, now)).getColumns()).as(key).hasSizeLessThanOrEqualTo(4)
+               .allSatisfy(column -> assertThat(column.getWidth()).isNull());
+         }
          assertThat(((TableData) home.data("partners", now)).getRows()).hasSize(1);
          for(String widget : FileGatewayHome.KEYS)
          {
