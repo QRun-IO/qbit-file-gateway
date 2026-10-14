@@ -134,7 +134,7 @@ public class FileGatewayHome extends AbstractWidgetRenderer
             .withCriteria(new QFilterCriteria("disconnectedAt", QCriteriaOperator.IS_BLANK))
             .withCriteria(new QFilterCriteria("outcome", QCriteriaOperator.EQUALS, "CONNECTED")));
          return ("sessions".equals(key) ? new StatisticsData(rows.size(), null, null) : table("Active sessions", FileGatewayTables.CONNECTION_LOG, rows,
-            List.of("username", "remoteIp", "connectedAt", "operationCount", "podName"), List.of("Username", "IP", "Connected", "Operations", "Pod")));
+            List.of("username", "remoteIp", "connectedAt", "operationCount"), List.of("Username", "IP", "Connected", "Operations")));
       }
       if("servers".equals(key))
       {
