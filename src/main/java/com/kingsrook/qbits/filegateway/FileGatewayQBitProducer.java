@@ -43,6 +43,15 @@ import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
  *******************************************************************************/
 public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGatewayQBitConfig>
 {
+   /*******************************************************************************
+    ** The sftp wall owns its list (core's qbit prefixes are transitional and the
+    ** assistant may now read audits): partners never reach identity, audits,
+    ** webhooks or this qbit's own tables, read or write. Core's generic secret,
+    ** credential, permission and session patterns are added on top.
+    *******************************************************************************/
+   public static final java.util.List<String> SFTP_DENIED_PATTERNS = java.util.List.of(
+      "file_gateway_*", "audit*", "authentik_*", "webhooks_*", "worm_audit_*", "secured_data_*", "assistant_*");
+
    public static final String GROUP_ID    = "com.kingsrook.qbits";
    public static final String ARTIFACT_ID = "qbit-file-gateway";
    public static final String VERSION     = "0.1.0";
@@ -165,12 +174,13 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
       ClientChannelsMetaData channels = ClientChannelsMetaData.ofOrWithNew(qInstance)
          .withChannel("sftp", "SFTP file gateway").withDeniedPattern("sftp", "file_gateway_*")
          .withDeniedPattern("assistant", "file_gateway_*");
-      for(String pattern : ClientChannelsMetaData.ASSISTANT_DEFAULT_DENIED_PATTERNS)
+      for(String pattern : SFTP_DENIED_PATTERNS)
       {
-         if(!"assistant_*".equals(pattern))
-         {
-            channels.withDeniedPattern("sftp", pattern);
-         }
+         channels.withDeniedPattern("sftp", pattern);
+      }
+      for(String pattern : ClientChannelsMetaData.ASSISTANT_GENERIC_DENIED_PATTERNS)
+      {
+         channels.withDeniedPattern("sftp", pattern);
       }
       com.kingsrook.qbits.filegateway.api.FileGatewayOutbox.setProvider(new com.kingsrook.qbits.filegateway.outbox.OutboxService(qInstance,
          new com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore(qInstance, qBitConfig.getFileGatewayBucketAlias()), qBitConfig, java.time.Clock.systemUTC()));
