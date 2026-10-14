@@ -261,7 +261,7 @@ public final class FileGatewayTables
     *******************************************************************************/
    private static QTableMetaData upload_job(FileGatewayQBitConfig config)
    {
-      QTableMetaData table = base(config, UPLOAD_JOB, "Upload Jobs")
+      QTableMetaData table = base(config, UPLOAD_JOB, "Upload Jobs").withRecordVersionField("status")
          .withRecordLabelFormatAndFields("%s", "id")
          .withField(field("accountId", QFieldType.INTEGER).withPossibleValueSourceName(ACCOUNT))
          .withField(field("aliasId", QFieldType.INTEGER).withPossibleValueSourceName(ALIAS))
@@ -283,6 +283,7 @@ public final class FileGatewayTables
          .withField(field("errorCount", QFieldType.INTEGER))
          .withField(field("resultSummary", QFieldType.TEXT))
          .withField(field("resultsStorageKey", QFieldType.STRING))
+         .withField(field("resultsSizeBytes", QFieldType.LONG))
          .withField(field("errorMessage", QFieldType.TEXT))
          .withField(field("attempts", QFieldType.INTEGER))
          .withField(field("nextAttemptAt", QFieldType.DATE_TIME))
@@ -293,7 +294,7 @@ public final class FileGatewayTables
          .withField(field("finishedAt", QFieldType.DATE_TIME))
          .withField(field("acknowledgedAt", QFieldType.DATE_TIME));
       table.withSection(SectionFactory.defaultT1("id", "accountId", "aliasId", "connectionLogId", "remoteAddress", "tableName"));
-      table.withSection(SectionFactory.defaultT2("savedBulkLoadProfileId", "consumerName", "consumerReference", "path", "fileName", "sizeBytes", "sha256", "storageKey", "status", "duplicateOfJobId", "processUuid", "insertedCount", "errorCount", "resultSummary", "resultsStorageKey", "errorMessage", "attempts", "nextAttemptAt", "claimedBy", "claimedAt", "queuedAt", "startedAt", "finishedAt", "acknowledgedAt"));
+      table.withSection(SectionFactory.defaultT2("savedBulkLoadProfileId", "consumerName", "consumerReference", "path", "fileName", "sizeBytes", "sha256", "storageKey", "status", "duplicateOfJobId", "processUuid", "insertedCount", "errorCount", "resultSummary", "resultsStorageKey", "resultsSizeBytes", "errorMessage", "attempts", "nextAttemptAt", "claimedBy", "claimedAt", "queuedAt", "startedAt", "finishedAt", "acknowledgedAt"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
       table.withSection(SectionFactory.customT2(TRANSFER_LOG, new QIcon("list")).withWidgetName(UPLOAD_JOB + "_children_" + TRANSFER_LOG));
       table.withoutCapabilities(Capability.TABLE_INSERT, Capability.TABLE_UPDATE, Capability.TABLE_DELETE);

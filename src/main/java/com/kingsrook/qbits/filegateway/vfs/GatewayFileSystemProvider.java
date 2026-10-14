@@ -50,7 +50,7 @@ import java.util.Set;
 
 
 /*******************************************************************************
- ** NIO operations resolve against the virtual tree; every mutation is denied and audited.
+ ** NIO operations resolve against the virtual tree and its explicitly supported upload artifacts.
  *******************************************************************************/
 public class GatewayFileSystemProvider extends FileSystemProvider
 {
@@ -133,12 +133,11 @@ public class GatewayFileSystemProvider extends FileSystemProvider
    public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException
    {
       boolean write = options.contains(StandardOpenOption.WRITE) || options.contains(StandardOpenOption.APPEND) || options.contains(StandardOpenOption.CREATE) || options.contains(StandardOpenOption.CREATE_NEW);
-      if(!write)
+      if(options.contains(StandardOpenOption.APPEND))
       {
-         fileSystem.tree().stat(name(path));
+         fileSystem.tree().deny(name(path), "UPLOAD", "Appending to stored uploads is unsupported");
       }
-      fileSystem.tree().deny(name(path), write ? "UPLOAD" : "DOWNLOAD", "not yet supported");
-      throw (new AssertionError());
+      return (write ? fileSystem.tree().write(name(path)) : fileSystem.tree().read(name(path)));
    }
 
 
@@ -180,7 +179,7 @@ public class GatewayFileSystemProvider extends FileSystemProvider
    @Override
    public void delete(Path path) throws IOException
    {
-      fileSystem.tree().deny(name(path), "REMOVE", "Removal is not supported");
+      fileSystem.tree().remove(name(path));
    }
 
 
@@ -202,7 +201,7 @@ public class GatewayFileSystemProvider extends FileSystemProvider
    @Override
    public void move(Path source, Path target, CopyOption... options) throws IOException
    {
-      fileSystem.tree().deny(name(source), "RENAME", "Rename is not supported");
+      fileSystem.tree().rename(name(source), name(target));
    }
 
 
@@ -251,7 +250,11 @@ public class GatewayFileSystemProvider extends FileSystemProvider
       {
          if(mode == AccessMode.WRITE)
          {
-            fileSystem.tree().deny(name(path), "UPLOAD", "Writes are not supported");
+            VirtualTree.Node node = fileSystem.tree().stat(name(path));
+            if(!node.directory() || !"PROFILE".equals(node.kind()) || node.objectId() == null)
+            {
+               fileSystem.tree().deny(name(path), "UPLOAD", "Writes require a profile folder");
+            }
          }
       }
    }
@@ -292,7 +295,7 @@ public class GatewayFileSystemProvider extends FileSystemProvider
       result.put("isRegularFile", attrs.isRegularFile());
       result.put("isSymbolicLink", false);
       result.put("isOther", false);
-      result.put("size", 0L);
+      result.put("size", attrs.size());
       result.put("fileKey", attrs.fileKey());
       result.put("lastModifiedTime", attrs.lastModifiedTime());
       result.put("lastAccessTime", attrs.lastAccessTime());

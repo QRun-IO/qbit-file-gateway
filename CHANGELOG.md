@@ -6,6 +6,17 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Added
 
+- Phase (b) bounded streaming uploads through the object-storage system API, SHA-256, concurrent
+  byte quotas, temporary-name promotion, dedupe and transfer auditing.
+- Bounded upload workers with guarded claims, fresh user sessions, scanner/quarantine hooks,
+  named consumers, retry scheduling, stale recovery and shutdown requeue.
+- Built-in bulk-load consumer using only spec-defined UI API operations, saved mappings,
+  inserted/error summaries, per-row examples, notifications and a Retry upload record action.
+- Readable sidecars, results CSV and ranged archive downloads with account isolation and
+  acknowledgement. Added `results_size_bytes` to the upload-job schema.
+- Real MINA upload acceptance coverage, including permissions, auditing, limits, reordering,
+  consumer retries, quarantine, worker concurrency and the unchanged no-disk guard.
+
 - Phase (a) SSH-key-only SFTP runtime with in-memory host keys, explicit modern algorithms,
   account/key expiry, numeric CIDR allowlists, transactional account lockout/session limits,
   per-IP limits, user-session refresh and live revocation.
@@ -23,4 +34,7 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 - Local invoker integration builds use `4.1.0-FG-SNAPSHOT`; CI retains the POM's
   `4.1.0-SNAPSHOT` default. RDBMS remains a host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
-- Uploads, downloads, endpoint routing/chroot, outbox delivery and app home remain later phases.
+- Saved-view/report downloads, endpoint routing/chroot, outbox delivery and app home remain later
+  phases. Object-storage RC.2 controls S3 part size through its connection configuration.
+- With the private core build, the file-mapping request resends its file to select multipart
+  encoding; URL-encoded process values are not accepted by the v1 route.

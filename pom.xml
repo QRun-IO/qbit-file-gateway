@@ -73,6 +73,11 @@
    </scm>
 
    <dependencies>
+      <dependency>
+         <groupId>com.kingsrook.qbits</groupId>
+         <artifactId>qbit-object-storage</artifactId>
+         <version>0.1.0-RC.2</version>
+      </dependency>
       <!-- MINA's Ed25519 key decoder and signer. -->
       <dependency>
          <groupId>net.i2p.crypto</groupId>

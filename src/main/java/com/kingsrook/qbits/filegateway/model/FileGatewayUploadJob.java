@@ -105,6 +105,9 @@ public class FileGatewayUploadJob extends QRecordEntity
    private String resultsStorageKey;
 
    @QField
+   private Long resultsSizeBytes;
+
+   @QField
    private String errorMessage;
 
    @QField
@@ -1141,4 +1144,30 @@ public class FileGatewayUploadJob extends QRecordEntity
    {
       this.acknowledgedAt = acknowledgedAt;
    }
+
+   /*******************************************************************************
+    ** Stored result artifact length.
+    *******************************************************************************/
+   public Long getResultsSizeBytes()
+   {
+      return (resultsSizeBytes);
+   }
+
+   /*******************************************************************************
+    ** Populate result artifact length.
+    *******************************************************************************/
+   public void setResultsSizeBytes(Long value)
+   {
+      resultsSizeBytes = value;
+   }
+
+   /*******************************************************************************
+    ** Fluent result artifact length.
+    *******************************************************************************/
+   public FileGatewayUploadJob withResultsSizeBytes(Long value)
+   {
+      resultsSizeBytes = value;
+      return (this);
+   }
+
 }

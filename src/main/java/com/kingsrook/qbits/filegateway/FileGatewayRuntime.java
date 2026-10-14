@@ -29,6 +29,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.function.Function;
 import com.kingsrook.qbits.filegateway.sftp.SftpProtocolServer;
+import com.kingsrook.qbits.filegateway.storage.GatewayObjectStore;
+import com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore;
+import com.kingsrook.qbits.filegateway.upload.UploadJobWorker;
 import com.kingsrook.qqq.backend.core.logging.QLogger;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
 import com.kingsrook.qqq.middleware.javalin.QApplicationJavalinServer;
@@ -46,16 +49,18 @@ public final class FileGatewayRuntime implements AutoCloseable
    private static final QLogger LOG = QLogger.getLogger(FileGatewayRuntime.class);
    private final UiApiInvoker invoker;
    private final SftpProtocolServer protocol;
+   private final UploadJobWorker worker;
 
 
 
    /*******************************************************************************
     ** Bind the host UI API server to the SFTP channel.
     *******************************************************************************/
-   private FileGatewayRuntime(QInstance instance, QApplicationJavalinServer server, FileGatewayQBitConfig config, KeyPair key, Clock clock, Duration interval, String podName)
+   private FileGatewayRuntime(QInstance instance, QApplicationJavalinServer server, FileGatewayQBitConfig config, KeyPair key, Clock clock, Duration interval, String podName, GatewayObjectStore store)
    {
       invoker = UiApiInvoker.forServer(server, "sftp");
-      protocol = new SftpProtocolServer(instance, config, invoker, key, clock, interval, podName);
+      protocol = new SftpProtocolServer(instance, config, invoker, key, clock, interval, podName, store);
+      worker = new UploadJobWorker(instance, invoker, config, store, clock, podName);
    }
 
 
@@ -80,8 +85,9 @@ public final class FileGatewayRuntime implements AutoCloseable
       {
          return (null);
       }
-      FileGatewayRuntime runtime = new FileGatewayRuntime(instance, server, config, hostKey(config, environment), Clock.systemUTC(), Duration.ofSeconds(60), environment.apply("HOSTNAME"));
+      FileGatewayRuntime runtime = new FileGatewayRuntime(instance, server, config, hostKey(config, environment), Clock.systemUTC(), Duration.ofSeconds(60), environment.apply("HOSTNAME"), new ObjectStorageGatewayStore(instance, config.getFileGatewayBucketAlias()));
       runtime.protocol.start();
+      runtime.worker.start(Duration.ofSeconds(60));
       return (runtime);
    }
 
@@ -92,7 +98,17 @@ public final class FileGatewayRuntime implements AutoCloseable
     *******************************************************************************/
    public static FileGatewayRuntime startForTest(QInstance instance, QApplicationJavalinServer server, FileGatewayQBitConfig config, KeyPair key, Clock clock, Duration pollInterval) throws IOException
    {
-      FileGatewayRuntime runtime = new FileGatewayRuntime(instance, server, config, key, clock, pollInterval, "test");
+      return (startForTest(instance, server, config, key, clock, pollInterval, new ObjectStorageGatewayStore(instance, config.getFileGatewayBucketAlias())));
+   }
+
+
+
+   /*******************************************************************************
+    ** Transfer tests supply an in-memory store with no production fallback.
+    *******************************************************************************/
+   public static FileGatewayRuntime startForTest(QInstance instance, QApplicationJavalinServer server, FileGatewayQBitConfig config, KeyPair key, Clock clock, Duration pollInterval, GatewayObjectStore store) throws IOException
+   {
+      FileGatewayRuntime runtime = new FileGatewayRuntime(instance, server, config, key, clock, pollInterval, "test", store);
       runtime.protocol.start();
       return (runtime);
    }
@@ -133,6 +149,14 @@ public final class FileGatewayRuntime implements AutoCloseable
    public void stop() throws IOException
    {
       protocol.stop();
+      try
+      {
+         worker.close();
+      }
+      catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+      {
+         throw (new IOException("Unable to release upload jobs", e));
+      }
    }
 
 
@@ -165,4 +189,13 @@ public final class FileGatewayRuntime implements AutoCloseable
    {
       return (invoker);
    }
+
+   /*******************************************************************************
+    ** Deterministic worker hook for hosts and integration tests.
+    *******************************************************************************/
+   public UploadJobWorker getWorker()
+   {
+      return (worker);
+   }
+
 }

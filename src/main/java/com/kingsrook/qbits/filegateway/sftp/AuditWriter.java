@@ -24,6 +24,7 @@ package com.kingsrook.qbits.filegateway.sftp;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import com.kingsrook.qbits.filegateway.metadata.FileGatewayTables;
 import com.kingsrook.qqq.backend.core.actions.QBackendTransaction;
 import com.kingsrook.qqq.backend.core.actions.permissions.CorePermissionEnforcer;
@@ -112,7 +113,7 @@ public class AuditWriter
    /*******************************************************************************
     ** Lock one account row without changing any user-managed fields.
     *******************************************************************************/
-   private <T> T withAccountLock(String field, Serializable value, Work<T> work) throws QException
+   public <T> T withAccountLock(String field, Serializable value, Work<T> work) throws QException
    {
       return (system(() ->
       {
@@ -215,6 +216,24 @@ public class AuditWriter
       checkTable(table);
       QRecord result = system(() -> new UpdateAction().execute(new UpdateInput(table).withRecords(List.of(record)).withTransaction(transaction.get())).getRecords().get(0));
       checkErrors(result);
+   }
+
+
+
+   /*******************************************************************************
+    ** Optimistic status transition, called under withAccountLock because core checks
+    ** expected versions before SQL execution rather than in the SQL WHERE clause.
+    *******************************************************************************/
+   public boolean transitionUpload(QRecord changes, String expectedStatus) throws QException
+   {
+      QRecord result = system(() -> new UpdateAction().execute(new UpdateInput(FileGatewayTables.UPLOAD_JOB)
+         .withRecords(List.of(changes)).withTransaction(transaction.get())
+         .withExpectedVersions(Map.of(changes.getValue("id"), expectedStatus))).getRecords().getFirst());
+      if(result.getErrors() != null && !result.getErrors().isEmpty())
+      {
+         return (false);
+      }
+      return (true);
    }
 
 

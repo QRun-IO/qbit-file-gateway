@@ -40,9 +40,22 @@ QBitMetaDataProducer<FileGatewayQBitConfig>`.
   checks its operation spec and sends user credentials plus `sftp/<sessionId>` client detail.
 - `api/`: isolated consumer/outbox contract. Never import gateway implementation packages here.
 
-Phase (a) supports listing/stat and denies reads/mutations with audit. Upload/download workers,
-endpoint routing/chroot, outbox delivery, Quick Search/ESB, preferences, retention and the app
-home belong to later phases. The core-valid alert type is `filegateway.lockout`; the design's
+Phase (b) adds `upload/` (bounded streaming channels, database quota reservations, worker claims,
+scanner/consumer pipeline and UI API bulk load) and `storage/` (the object-storage API adapter
+and ranged read channels). Production uses object storage; the memory implementation is tests-only.
+The runtime starts a bounded worker pool with SFTP and releases owned claims on stop. Sidecars,
+results and archive are readable; sidecars/results can be acknowledged. Retry upload is a
+standard Review/Result record action. The upload-job schema now includes `results_size_bytes`.
+
+Claims compare expected status under an account-row transaction; core's optimistic version check
+alone does not add a SQL WHERE guard. Fresh worker user sessions outlive SSH connections and are
+revoked after delivery. Bulk process multipart field: `theFile`; mapping frontend step: `fileMapping`
+(resumes `receiveFileMapping`). RC.2 object storage owns S3 part size at connection level. The
+private invoker selects multipart only when a file part is present, so the mapping request
+restreams the file with its values. See README adoption prerequisites and compatibility notes.
+
+Saved-view/report downloads, endpoint routing/chroot, outbox delivery, Quick Search/ESB,
+preferences, retention and the app home belong to later phases. The core-valid alert type is `filegateway.lockout`; the design's
 underscore-only name is rejected by core validation.
 
 Tests run a strict UI API server, H2 from the adopter DDL and real MINA clients. NoDiskExtension

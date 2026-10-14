@@ -452,7 +452,7 @@ class GatewayLifecycleTest
                assertThatThrownBy(() -> Files.copy(path, fs.getPath("/copy"))).isInstanceOf(AccessDeniedException.class);
                assertThat(fs.getFileStores()).isEmpty();
                assertThat(fs.getRootDirectories()).containsExactly(fs.getPath("/"));
-               assertThat(fs.isReadOnly()).isTrue();
+               assertThat(fs.isReadOnly()).isFalse();
                assertThat(fs.getSeparator()).isEqualTo("/");
                assertThatThrownBy(fs::newWatchService).isInstanceOf(UnsupportedOperationException.class);
                assertThatThrownBy(fs::getUserPrincipalLookupService).isInstanceOf(UnsupportedOperationException.class);

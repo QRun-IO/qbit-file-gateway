@@ -32,6 +32,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import com.kingsrook.qbits.filegateway.FileGatewayQBitConfig;
+import com.kingsrook.qbits.filegateway.storage.GatewayObjectStore;
+import com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore;
+import com.kingsrook.qbits.filegateway.upload.UploadJobs;
 import com.kingsrook.qbits.filegateway.vfs.GatewayFileSystem;
 import com.kingsrook.qbits.filegateway.vfs.GatewayUiApiClient;
 import com.kingsrook.qbits.filegateway.vfs.VirtualTree;
@@ -74,6 +77,16 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
     *******************************************************************************/
    public SftpProtocolServer(QInstance instance, FileGatewayQBitConfig config, UiApiInvoker invoker, KeyPair hostKey, Clock clock, Duration pollInterval, String podName)
    {
+      this(instance, config, invoker, hostKey, clock, pollInterval, podName, new ObjectStorageGatewayStore(instance, config.getFileGatewayBucketAlias()));
+   }
+
+
+
+   /*******************************************************************************
+    ** Inject storage for transfer tests; production uses the object-storage implementation.
+    *******************************************************************************/
+   public SftpProtocolServer(QInstance instance, FileGatewayQBitConfig config, UiApiInvoker invoker, KeyPair hostKey, Clock clock, Duration pollInterval, String podName, GatewayObjectStore store)
+   {
       this.pollInterval = pollInterval;
       AuditWriter audit = new AuditWriter(instance);
       authenticator = new SshKeyAuthenticator(instance, config, audit, clock, podName);
@@ -95,7 +108,18 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
       server.setCommandFactory(null);
       server.setForwardingFilter(RejectAllForwardingFilter.INSTANCE);
       server.setAgentFactory(null);
-      server.setSubsystemFactories(List.of(new SftpSubsystemFactory.Builder().build()));
+      server.setSubsystemFactories(List.of(new SftpSubsystemFactory.Builder().withFileSystemAccessor(new org.apache.sshd.sftp.server.SftpFileSystemAccessor()
+      {
+         /*******************************************************************************
+          ** MINA must use our seekable channels, not the native FileChannel default.
+          *******************************************************************************/
+         @Override
+         public java.nio.channels.SeekableByteChannel openFile(org.apache.sshd.sftp.server.SftpSubsystemProxy subsystem, org.apache.sshd.sftp.server.FileHandle handle, Path path, String handleId,
+            java.util.Set<? extends java.nio.file.OpenOption> options, java.nio.file.attribute.FileAttribute<?>... attributes) throws IOException
+         {
+            return (java.nio.file.Files.newByteChannel(path, options, attributes));
+         }
+      }).build()));
       CoreModuleProperties.IDLE_TIMEOUT.set(server, Duration.ofMinutes(15));
       CoreModuleProperties.AUTH_TIMEOUT.set(server, Duration.ofSeconds(30));
       server.setFileSystemFactory(new FileSystemFactory()
@@ -116,7 +140,7 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
          public FileSystem createFileSystem(SessionContext session)
          {
             GatewaySession state = session.getAttribute(GatewaySession.ATTRIBUTE);
-            return (new GatewayFileSystem(new VirtualTree(new GatewayUiApiClient(invoker, state), state, audit, clock)));
+            return (new GatewayFileSystem(new VirtualTree(new GatewayUiApiClient(invoker, state), state, audit, clock).withUploads(new UploadJobs(audit, store, config, clock), store)));
          }
       });
       server.addSessionListener(new SessionListener()
