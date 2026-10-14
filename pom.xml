@@ -238,8 +238,8 @@
             <activeByDefault>true</activeByDefault>
          </activation>
          <properties>
-            <!-- STAND-IN(core=QRun-IO/qqq develop after v4.1.0-RC.5, removeBy=4.1.0-RC.6): UiApiInvoker client channels and QAlerts.notify are on develop only; pin the RC when it is cut -->
-            <qqq.snapshot.version>4.1.0-SNAPSHOT</qqq.snapshot.version>
+            <!-- QQQ 4.1.0-RC.7: the first released core with the UiApiInvoker in-process sessions, streams and multipart (QRun-IO/qqq#1170). Never a SNAPSHOT (guardrail G7). -->
+            <qqq.snapshot.version>4.1.0-RC.7</qqq.snapshot.version>
          </properties>
          <dependencyManagement>
             <dependencies>

@@ -250,8 +250,8 @@ in-process session token; there is never a service session.
   (`ProcessSpecUtilsV1.addUploadedFiles`).
 
 ### Shipping
-§3.1–3.3 go in one core PR to `QRun-IO/qqq` `develop`, for 4.1.0-RC.6. Until then the qbit builds
-on `4.1.0-SNAPSHOT`, with the pom marked `STAND-IN(removeBy=4.1.0-RC.6)`.
+§3.1–3.3 shipped in QRun-IO/qqq#1170 (merged 2026-10-14), first released in QQQ 4.1.0-RC.7, which
+the qbit pins.
 
 ### 3.4 Permissions for automated sessions (qbit-authentik)
 `AuthentikGroupPermissionMapper` builds permissions from token claims, and an automated session
@@ -678,10 +678,10 @@ All tests run in the qbit's build.
   `Class.forName` of another qbit. The gateway's own `api` package is the published contract.
 - **G2.** Server tests run in strict mode.
 - **G3.** No extension is registered: the gateway is a UI API client.
-- **G4.** Stand-ins are marked `STAND-IN(core=..., removeBy=...)`: the 4.1.0-SNAPSHOT baseline
-  until RC.6, and the preferences section until #1162.
+- **G4.** No stand-ins remain: the core baseline is a release, and the preferences section uses
+  core's API from QRun-IO/qqq#1162.
 - **G5.** No HTML widgets.
-- **G7.** Pin 4.1.0-RC.6 as soon as it is cut. Until then, develop builds on the SNAPSHOT.
+- **G7.** Pinned to QQQ 4.1.0-RC.7; never a SNAPSHOT.
 
 ## 14. Phases
 - **(a)** The SFTP server, the virtual filesystem, and auth:

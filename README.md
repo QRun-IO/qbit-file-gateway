@@ -17,8 +17,8 @@ backend, qbit-object-storage 0.1.0-RC.2, and core saved bulk-load profile, saved
 report metadata. The gateway's
 RDBMS module dependency is test-scoped. Maven 3.9.11 is pinned by the wrapper.
 
-Until the invoker core PR merges, local builds use the private `4.1.0-FG-SNAPSHOT` artifacts.
-The POM default remains `4.1.0-SNAPSHOT` for CI, to be replaced by 4.1.0-RC.6 when released.
+QQQ is pinned to `4.1.0-RC.7`, the first release with the UiApiInvoker in-process sessions,
+streams and multipart (QRun-IO/qqq#1170).
 
 ## Install
 
@@ -325,13 +325,13 @@ port 22 only (no passive range: v1 is SFTP only) with `externalTrafficPolicy: Lo
 ## Build and acceptance tests
 
 ```bash
-./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT verify
+./mvnw verify
 ```
 
 PowerShell:
 
 ```powershell
-./mvnw.cmd -o '-Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT' verify
+./mvnw.cmd verify
 ```
 
 The tests use H2 from the adopter DDL, a strict UI API server, generated in-memory SSH keys and

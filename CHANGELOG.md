@@ -45,8 +45,8 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Compatibility
 
-- Local invoker integration builds use `4.1.0-FG-SNAPSHOT`; CI retains the POM's
-  `4.1.0-SNAPSHOT` default. RDBMS remains a host-provided runtime dependency.
+- Builds on QQQ `4.1.0-RC.7` (the first release with QRun-IO/qqq#1170). RDBMS remains a
+  host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
 - Object-storage RC.2 controls S3 part size through its connection configuration.
 - The Preferences "File transfer" section waits for QRun-IO/qqq#1162.
