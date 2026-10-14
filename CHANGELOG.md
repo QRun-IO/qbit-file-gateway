@@ -6,6 +6,12 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Added
 
+- Phase (c) generated saved-view and saved-report downloads through the user-scoped UI API,
+  CSV/XLSX/JSON account formats, a bounded rolling read window and HTTP stream cleanup.
+- Generated-file and UTC daily-download quotas, persisted byte charges under account locks,
+  per-file VIEW/REPORT transfer auditing and actionable SFTP API/limit errors.
+- Real MINA download tests for filters/column order, POI XLSX validation, JSON, FieldSecurityLock
+  DENY parity, report rendering, hidden tables/storage, large streaming exports and quotas.
 - Phase (b) bounded streaming uploads through the object-storage system API, SHA-256, concurrent
   byte quotas, temporary-name promotion, dedupe and transfer auditing.
 - Bounded upload workers with guarded claims, fresh user sessions, scanner/quarantine hooks,
@@ -34,7 +40,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 - Local invoker integration builds use `4.1.0-FG-SNAPSHOT`; CI retains the POM's
   `4.1.0-SNAPSHOT` default. RDBMS remains a host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
-- Saved-view/report downloads, endpoint routing/chroot, outbox delivery and app home remain later
+- Endpoint routing/chroot, outbox delivery and app home remain later
   phases. Object-storage RC.2 controls S3 part size through its connection configuration.
-- With the private core build, the file-mapping request resends its file to select multipart
-  encoding; URL-encoded process values are not accepted by the v1 route.
+- Private core #1170 sends multipart process values without re-uploading the original file.
+- FieldSecurityLock requires core permission enforcement enabled. Saved-report rendering still
+  uses a temporary file inside core; fully disk-free report generation needs a core change.
+  The report folder is hidden without the render process's configured storage table.

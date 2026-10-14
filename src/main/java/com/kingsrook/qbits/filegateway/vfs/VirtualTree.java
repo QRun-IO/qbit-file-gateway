@@ -70,6 +70,7 @@ public class VirtualTree
    private final Clock clock;
    private UploadJobs uploads;
    private GatewayObjectStore store;
+   private GeneratedDownloads downloads;
    private JsonNode metadata;
    private Instant metadataAt;
    private final Map<String, JsonNode> saved = new HashMap<>();
@@ -97,6 +98,16 @@ public class VirtualTree
    {
       this.uploads = uploads;
       this.store = store;
+      return (this);
+   }
+
+
+   /*******************************************************************************
+    ** Attach generated downloads and the host's report-storage availability.
+    *******************************************************************************/
+   public VirtualTree withDownloads(GeneratedDownloads downloads)
+   {
+      this.downloads = downloads;
       return (this);
    }
 
@@ -259,7 +270,7 @@ public class VirtualTree
       {
          folders.add("views");
       }
-      if(meta.path("tables").has("savedReport") && meta.path("processes").has("renderSavedReport"))
+      if(downloads != null && downloads.reportsAvailable() && meta.path("tables").has("savedReport") && meta.path("processes").has("renderSavedReport"))
       {
          folders.add("reports");
       }
@@ -424,11 +435,15 @@ public class VirtualTree
 
 
    /*******************************************************************************
-    ** Read only stored artifacts and generated sidecars; view/report export is phase c.
+    ** Open generated views/reports or stored artifacts without using the filesystem.
     *******************************************************************************/
    public SeekableByteChannel read(String path) throws IOException
    {
       Node node = stat(path);
+      if(downloads != null && !node.directory() && List.of("VIEW", "REPORT").contains(node.kind()))
+      {
+         return (downloads.open(node));
+      }
       if(node.job() == null || node.directory() || "TEMPORARY".equals(node.kind()))
       {
          deny(path, "DOWNLOAD", "This file is not downloadable");

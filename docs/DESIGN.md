@@ -165,7 +165,7 @@ exists on any disk.
 | table | the table is in the app and in `metaData.tables` (read permission) |
 | `upload/` | the table has the bulk-insert process (`<table>.bulkInsert`) in metaData, and at least one saved bulk-load profile is visible (`POST /table/savedBulkLoadProfile/query` filtered by `tableName`) |
 | `views/` | the user can query `savedView` |
-| `reports/` | the user can query `savedReport` and has the `renderSavedReport` process |
+| `reports/` | the user can query `savedReport`, has the `renderSavedReport` process, and that process's `storageTableName` input default names an existing storage-capable table |
 | `results/`, `archive/` | always (they hold only this account's jobs) |
 
 - **Caching.** Metadata responses are cached in memory per SFTP session for 60 seconds. Saved-object
@@ -332,6 +332,11 @@ The gateway registers a "File transfer" section with the provider `FileTransferP
 
 ## 5. Download
 Everything is streamed. Nothing is written to disk.
+
+The gateway itself streams without disk. Core's `RenderSavedReportExecuteStep` stages the
+rendered report in a JVM temp file and deletes it in try-with-resources before the process step
+returns. That is the bounded temp area the owner rule allows, so the `emptyDir` temp mount must be
+sized for the largest report. The no-disk test asserts the temp area is empty after each transfer.
 
 - **Saved view** (`views/<slug>.<fmt>`):
   - `POST /table/savedView/query` by table name, as the user;
@@ -593,8 +598,8 @@ The gateway is a separate, stateless Deployment of the same image. An example is
   - `FILE_GATEWAY_SSH_HOST_KEY` from a Secret; in kof22, through ESO from Infisical.
   - 2 replicas, with a PodDisruptionBudget of `minAvailable: 1`.
   - `readOnlyRootFilesystem: true`. The only writable mount is a small in-memory `emptyDir`
-    (`medium: Memory`, `sizeLimit: 64Mi`) for the JVM temp directory. Nothing is persisted.
-  - Requests of 250m CPU and 768Mi memory; a 1.5Gi memory limit. The in-memory buffers are bounded
+    (`medium: Memory`, `sizeLimit: 512Mi`, counted in the memory limit) for the JVM temp directory, sized for the largest saved report core stages there. Nothing is persisted.
+  - Requests of 250m CPU and 768Mi memory; a 2Gi memory limit. The in-memory buffers are bounded
     by the config.
 - **Ports and probes.**
   - Container ports: 2222 (sftp) and the app's HTTP port, which serves loopback and probes only.

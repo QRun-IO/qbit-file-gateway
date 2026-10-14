@@ -85,6 +85,7 @@ public class FileGatewayTestServer implements AutoCloseable
    public final FileGatewayRuntime runtime;
    public final SshClient client;
    public final java.util.List<ApiCall> calls = new java.util.concurrent.CopyOnWriteArrayList<>();
+   public volatile int exportFailureStatus;
 
    /*******************************************************************************
     ** Non-secret request evidence for the invoker contract assertions.
@@ -111,6 +112,18 @@ public class FileGatewayTestServer implements AutoCloseable
     ** Controllable time for expiry, session refresh and metadata caching.
     *******************************************************************************/
    public FileGatewayTestServer(Clock clock) throws Exception
+   {
+      this(clock, instance ->
+      {
+         // Most acceptance tests use the default application metadata.
+      });
+   }
+
+
+   /*******************************************************************************
+    ** Customize application metadata before validation and server startup.
+    *******************************************************************************/
+   public FileGatewayTestServer(Clock clock, java.util.function.Consumer<QInstance> customize) throws Exception
    {
       ConnectionManager.resetConnectionProviders();
       GRANTS.clear();
@@ -167,9 +180,11 @@ public class FileGatewayTestServer implements AutoCloseable
       }
       instance.addBackend(new com.kingsrook.qqq.backend.core.model.metadata.QBackendMetaData()
          .withName("memory").withBackendType(com.kingsrook.qqq.backend.core.modules.backend.implementations.memory.MemoryBackendModule.class));
+      instance.getTable("reportStorage").setBackendName("memory");
       instance.addTable(new QTableMetaData().withName("testUploadArchive").withBackendName("memory").withPrimaryKeyField("reference")
          .withField(new QFieldMetaData("reference", QFieldType.STRING)).withField(new QFieldMetaData("contents", QFieldType.BLOB)));
       instance.withSupplementalMetaData(new com.kingsrook.qqq.middleware.javalin.QJavalinMetaData().withUploadedFileArchiveTableName("testUploadArchive"));
+      customize.accept(instance);
       new QInstanceEnricher(instance).enrich();
       new QInstanceValidator().validate(instance);
       QContext.init(instance, new QSystemUserSession(instance));
@@ -184,13 +199,60 @@ public class FileGatewayTestServer implements AutoCloseable
             return (instance);
          }
       }).withPort(0).withServeFrontendMaterialDashboard(false).withServeFrontendNext(false)
-         .withJavalinConfigCustomizer(j -> j.routes.before(ctx -> calls.add(new ApiCall(ctx.method().name(), ctx.path(), ctx.header("X-QQQ-Client"), ctx.header("X-QQQ-Invoked-By")))))
+         .withJavalinConfigCustomizer(j -> j.routes.before(ctx ->
+         {
+            calls.add(new ApiCall(ctx.method().name(), ctx.path(), ctx.header("X-QQQ-Client"), ctx.header("X-QQQ-Invoked-By")));
+            if(exportFailureStatus != 0 && ctx.path().endsWith("/export"))
+            {
+               throw (new io.javalin.http.HttpResponseException(exportFailureStatus, "Export failure test"));
+            }
+         }))
          .withStrictUiApiRoutes(true).withMiddlewareVersionList(List.of(new MiddlewareVersionV1()));
       http.start();
       runtime = FileGatewayRuntime.startForTest(instance, http, config, KeyUtils.generateKeyPair("ecdsa-sha2-nistp256", 256), clock, Duration.ofHours(1), store);
       client = SshClient.setUpDefaultClient();
       client.setServerKeyVerifier(AcceptAllServerKeyVerifier.INSTANCE);
       client.start();
+   }
+
+
+   /*******************************************************************************
+    ** Seed many export rows without generating unrelated insert audits.
+    *******************************************************************************/
+   public void seedRows(int count) throws Exception
+   {
+      try(var statement = keeper.prepareStatement("INSERT INTO alpha (id, name, quantity) VALUES (?, ?, ?)"))
+      {
+         for(int i = 1; i <= count; i++)
+         {
+            statement.setInt(1, i);
+            statement.setString(2, "Row " + i + " " + "x".repeat(50));
+            statement.setInt(3, i);
+            statement.addBatch();
+            if(i % 1000 == 0)
+            {
+               statement.executeBatch();
+            }
+         }
+         statement.executeBatch();
+      }
+   }
+
+
+   /*******************************************************************************
+    ** Seed quota history with an exact UTC timestamp rather than the insertion clock.
+    *******************************************************************************/
+   public void seedTransfer(QRecord account, String operation, long bytes, java.time.Instant when) throws Exception
+   {
+      QRecord row = audit.insert("file_gateway_transfer_log", new QRecord().withValue("accountId", account.getValue("id"))
+         .withValue("operation", operation).withValue("bytes", bytes).withValue("outcome", "OK")
+         .withValue("path", "/history.csv").withValue("clientChannel", "sftp/history"));
+      try(var statement = keeper.prepareStatement("UPDATE file_gateway_transfer_log SET create_date = ? WHERE id = ?"))
+      {
+         statement.setObject(1, when.atOffset(java.time.ZoneOffset.UTC).toLocalDateTime());
+         statement.setInt(2, row.getValueInteger("id"));
+         statement.executeUpdate();
+      }
    }
 
 

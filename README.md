@@ -4,9 +4,9 @@ An SSH-key-only SFTP server that presents a QQQ application's permitted apps and
 virtual folder tree. Application metadata and saved objects are read through the spec-defined
 `/qqq/v1` UI API as the signed-in user, using `UiApiInvoker` on channel `sftp`.
 
-Phases (a) and (b) implement authentication, listing/stat, account administration, uploads into
-saved bulk-load profiles, background consumer delivery, and readable sidecars/results/archive.
-Saved-view/report downloads, endpoint routing/chroot, outbox delivery, preferences and the app
+Phases (a) through (c) implement authentication, listing/stat, account administration, uploads into
+saved bulk-load profiles, background consumer delivery, readable sidecars/results/archive and
+saved-view/report downloads. Endpoint routing/chroot, outbox delivery, preferences and the app
 home follow in later phases. No native filesystem, host-key file, home directory or spool is
 used by the gateway. See [the approved design](docs/DESIGN.md).
 
@@ -109,12 +109,12 @@ The root lists visible apps; apps contain child apps and readable tables. Table 
 
 - `upload/<profile-slug>/` when the user has insert permission, a visible profile and a bulk-insert process;
 - `views/<slug>.csv` and `.xlsx` (or account-enabled JSON);
-- `reports/<slug>.<format>` when the saved-report table and render process are available;
+- `reports/<slug>.<format>` when the saved-report table, render process and its configured storage table are available;
 - account-scoped `results/<jobId>-<file>.results.csv` and `archive/<yyyy-mm-dd>/<jobId>-<file>`.
 
 Hidden paths return no-such-file. Slug collisions append record IDs. Saved-object queries are
 paged. Metadata and saved objects are cached per connection for 60 and 30 seconds respectively.
-Saved-view/report files report size zero and remain unreadable until phase (c). Stored artifacts
+Saved-view/report files report size zero (unknown); clients read until EOF. Stored artifacts
 report their actual lengths and support ranged reads.
 
 Only public-key auth is advertised. Password, keyboard-interactive, GSSAPI, host-based auth,
@@ -131,6 +131,46 @@ and heartbeats connection rows; three-minute-old heartbeats no longer count as a
 Lockouts raise core `QAlerts` signals. **Core compatibility:** the alert type is
 `filegateway.lockout`, because the core validator rejects the design's underscore-only
 `file_gateway_lockout`. Without an alert sink the core logging fallback is used.
+
+## Generated downloads
+
+Opening `views/<slug>.<format>` queries the saved view again as the account user and starts
+`POST /table/{table}/export` through `UiApiInvoker.invokeForStream`. The saved view's
+`queryFilter` (including `orderBys`) and visible `queryColumns.columns` are preserved in order;
+the UI selection column and pagination are excluded. Legacy explicit `fieldNames` are also
+supported. CSV includes a header; CSV, XLSX and JSON are offered only when enabled in the
+account's `formats` (default `csv,xlsx`).
+
+Opening `reports/<slug>.<format>` selects that saved report through the `renderSavedReport`
+record action, submits `reportFormat`, polls asynchronous status and streams the returned
+`/download/{file}` storage reference. The process's `storageTableName` input default must name
+an existing storage-capable table, backed by object storage in production. Without that table,
+`reports/` is hidden. Reports requiring additional interactive values fail with the API's error.
+
+Each generated handle retains at most `downloadReadAheadMb` MiB (default 16). Sequential reads
+and reordered reads within this rolling window work; a seek outside it fails with a message
+to download sequentially. The HTTP stream closes with the SFTP handle. Read requests are filled
+until EOF so MINA does not mistake a short HTTP packet for the end of an unknown-size file.
+
+`maxGeneratedFileMb` (default 1024) and `max_download_mb_per_day` are enforced as generated
+bytes enter the window. The daily total queries DOWNLOAD transfer rows for this account since
+UTC midnight, including failed and in-progress transfers; updates hold the account row lock so
+concurrent generated downloads share the cap. A rejected chunk is not exposed. Re-reading cached
+bytes does not charge them twice. One DOWNLOAD row per handle records the view/report ID, format,
+bytes, duration and outcome: OK, LIMIT, ERROR or DENIED for an HTTP 403. API error text reaches
+the SFTP client.
+
+**Field security:** configure `QInstance.enforcePermissionsInCoreActions=true` when using this
+private core build's `FieldSecurityLock` enforcement. Acceptance tests use a DENY lock and compare
+the generated CSV byte-for-byte with a direct UI export by the same user: default columns omit
+the denied field. Explicitly selecting a denied field fails as it does through the UI API.
+
+**Core filesystem limitation:** the current private core's `RenderSavedReportExecuteStep`
+creates and deletes a temporary file before publishing to storage. The gateway does not spool,
+and the existing no-disk snapshot/cleanup guard passes, but that guard cannot detect transient
+files. Fully disk-free saved-report generation remains blocked on replacing core's temporary
+file with storage streaming. CSV/XLSX/JSON table exports use core's streaming exporters; the
+50,000-row CSV acceptance test consumes the result with a fixed buffer.
 
 ## Uploads and object storage
 
