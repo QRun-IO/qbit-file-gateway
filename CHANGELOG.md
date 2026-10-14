@@ -4,6 +4,11 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+### Fixed
+
+- Endpoint pickers for saved views, saved reports and saved bulk-load profiles are dropped when
+  the host has not registered those possible-value sources, so hosts without them validate.
+
 ### Added
 
 - File transfer Preferences with connect-permission visibility, read-only connection details,

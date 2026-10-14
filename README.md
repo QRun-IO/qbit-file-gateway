@@ -36,6 +36,10 @@ Apply [docs/ddl/file_gateway.sql](docs/ddl/file_gateway.sql) to the host's datab
 H2 and PostgreSQL and stores UTC timestamps without a zone, matching QQQ's RDBMS binding.
 The gateway does not create or migrate tables at runtime.
 
+Register core's saved views, saved reports and saved bulk-load profiles (if the app uses them)
+before the gateway producer: endpoint pickers for a source the app hasn't registered become plain
+id fields, so the instance still validates.
+
 Register metadata while building the QInstance:
 
 ```java

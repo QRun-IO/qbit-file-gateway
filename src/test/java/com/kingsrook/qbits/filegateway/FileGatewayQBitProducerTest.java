@@ -100,6 +100,8 @@ class FileGatewayQBitProducerTest
    void contingentPickerMetadata(String source) throws Exception
    {
       var instance = new QInstance();
+      instance.addPossibleValueSource(new com.kingsrook.qqq.backend.core.model.metadata.possiblevalues.QPossibleValueSource().withName(source)
+         .withType(com.kingsrook.qqq.backend.core.model.metadata.possiblevalues.QPossibleValueSourceType.TABLE).withTableName(source));
       new FileGatewayQBitProducer().withQBitConfig(new FileGatewayQBitConfig()).produce(instance);
       var field = instance.getTable(FileGatewayTables.ALIAS).getField(source + "Id");
       assertThat(field.getPossibleValueSourceName()).isEqualTo(source);
@@ -111,5 +113,28 @@ class FileGatewayQBitProducerTest
          assertThat(c.getValues()).containsExactly("${input.tableName}");
       });
       assertThat(filter.getSubFilters()).isNullOrEmpty();
+   }
+
+
+
+   /*******************************************************************************
+    ** A host without saved views, reports or bulk-load profiles still validates:
+    ** those pickers become plain id fields; present sources keep their pickers.
+    *******************************************************************************/
+   @Test
+   void dropsPickersForMissingHostSources() throws Exception
+   {
+      QInstance instance = new QInstance();
+      com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData alias = FileGatewayTables.tables(new FileGatewayQBitConfig()).stream()
+         .filter(t -> t.getName().equals(FileGatewayTables.ALIAS)).findFirst().orElseThrow();
+      instance.addPossibleValueSource(new com.kingsrook.qqq.backend.core.model.metadata.possiblevalues.QPossibleValueSource().withName("savedView")
+         .withType(com.kingsrook.qqq.backend.core.model.metadata.possiblevalues.QPossibleValueSourceType.TABLE).withTableName("savedView"));
+      FileGatewayQBitProducer.dropMissingPickers(instance, alias);
+      assertThat(alias.getField("savedViewId").getPossibleValueSourceName()).isEqualTo("savedView");
+      assertThat(alias.getField("savedViewId").getPossibleValueSourceFilter()).isNotNull();
+      assertThat(alias.getField("savedReportId").getPossibleValueSourceName()).isNull();
+      assertThat(alias.getField("savedReportId").getPossibleValueSourceFilter()).isNull();
+      assertThat(alias.getField("savedBulkLoadProfileId").getPossibleValueSourceName()).isNull();
+      assertThat(alias.getField("tableName").getPossibleValueSourceName()).isEqualTo("tables");
    }
 }
