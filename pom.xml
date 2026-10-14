@@ -27,6 +27,7 @@
       <maven.compiler.target>21</maven.compiler.target>
       <jacoco.version>0.8.15</jacoco.version>
       <h2.version>2.2.224</h2.version>
+      <sshd.version>2.16.0</sshd.version>
    </properties>
 
    <parent>
@@ -72,6 +73,22 @@
    </scm>
 
    <dependencies>
+      <!-- MINA's Ed25519 key decoder and signer. -->
+      <dependency>
+         <groupId>net.i2p.crypto</groupId>
+         <artifactId>eddsa</artifactId>
+         <version>0.3.0</version>
+      </dependency>
+      <dependency>
+         <groupId>org.apache.sshd</groupId>
+         <artifactId>sshd-core</artifactId>
+         <version>${sshd.version}</version>
+      </dependency>
+      <dependency>
+         <groupId>org.apache.sshd</groupId>
+         <artifactId>sshd-sftp</artifactId>
+         <version>${sshd.version}</version>
+      </dependency>
       <dependency>
          <groupId>com.kingsrook.qqq</groupId>
          <artifactId>qqq-backend-core</artifactId>
@@ -114,6 +131,16 @@
 
    <build>
       <plugins>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+               <systemPropertyVariables>
+                  <java.io.tmpdir>${project.build.directory}/fg-tmp</java.io.tmpdir>
+                  <user.home>${project.build.directory}/fg-home</user.home>
+               </systemPropertyVariables>
+            </configuration>
+         </plugin>
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-checkstyle-plugin</artifactId>

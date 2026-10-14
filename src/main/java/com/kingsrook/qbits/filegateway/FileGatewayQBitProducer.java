@@ -21,17 +21,37 @@
 package com.kingsrook.qbits.filegateway;
 
 
+import java.util.List;
+import com.kingsrook.qbits.filegateway.metadata.FileGatewayProcesses;
+import com.kingsrook.qbits.filegateway.metadata.FileGatewayTables;
+import com.kingsrook.qbits.filegateway.permissions.FileGatewayPermissions;
+import com.kingsrook.qqq.backend.core.alerts.QAlertTypeMetaData;
+import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.model.metadata.MetaDataProducerMultiOutput;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
+import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppMetaData;
+import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppSection;
+import com.kingsrook.qqq.backend.core.model.metadata.layout.QIcon;
+import com.kingsrook.qqq.backend.core.model.metadata.permissions.ClientChannelsMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaDataProducer;
+import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
 
 
 /*******************************************************************************
- ** Entry point for the file-gateway qbit; no tables are produced yet.
+ ** Entry point for the file-gateway metadata; runtime startup belongs to the host.
  *******************************************************************************/
 public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGatewayQBitConfig>
 {
+   /*******************************************************************************
+    ** The sftp wall owns its list (core's qbit prefixes are transitional and the
+    ** assistant may now read audits): partners never reach identity, audits,
+    ** webhooks or this qbit's own tables, read or write. Core's generic secret,
+    ** credential, permission and session patterns are added on top.
+    *******************************************************************************/
+   public static final java.util.List<String> SFTP_DENIED_PATTERNS = java.util.List.of(
+      "file_gateway_*", "audit*", "authentik_*", "webhooks_*", "worm_audit_*", "secured_data_*", "assistant_*");
+
    public static final String GROUP_ID    = "com.kingsrook.qbits";
    public static final String ARTIFACT_ID = "qbit-file-gateway";
    public static final String VERSION     = "0.1.0";
@@ -108,13 +128,56 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
 
 
    /*******************************************************************************
-    ** Register this qbit and return its metadata, without producing tables.
+    ** Register tables, child lists, permissions, channel walls and the application.
     *******************************************************************************/
    @Override
-   public MetaDataProducerMultiOutput produce(QInstance qInstance)
+   public MetaDataProducerMultiOutput produce(QInstance qInstance) throws QException
    {
+      if(!isEnabled())
+      {
+         return (new MetaDataProducerMultiOutput());
+      }
       QBitMetaData qBit = getQBitMetaData();
-      qInstance.addQBit(qBit);
-      return (new MetaDataProducerMultiOutput().with(qBit));
+      MetaDataProducerMultiOutput output = new MetaDataProducerMultiOutput().with(qBit);
+      FileGatewayTables.possibleValueSources().forEach(output::add);
+      QAppMetaData app = new QAppMetaData().withName("file_gateway").withLabel("File Gateway")
+         .withIcon(new QIcon("folder_shared")).withPermissionRules(FileGatewayTables.permissionRules("file_gateway"));
+      for(QTableMetaData table : FileGatewayTables.tables(qBitConfig))
+      {
+         if(qBitConfig.getTableMetaDataCustomizer() != null)
+         {
+            table = qBitConfig.getTableMetaDataCustomizer().customizeMetaData(qInstance, table);
+         }
+         table.setSourceQBitName(qBit.getName());
+         output.add(table);
+         if(FileGatewayTables.MAIN.contains(table.getName()))
+         {
+            app.withChild(table);
+         }
+      }
+      app.withSection(new QAppSection().withName("configuration").withLabel("Configuration")
+         .withTables(List.of(FileGatewayTables.ACCOUNT, FileGatewayTables.ALIAS)));
+      app.withSection(new QAppSection().withName("activity").withLabel("Activity")
+         .withTables(List.of(FileGatewayTables.UPLOAD_JOB, FileGatewayTables.TRANSFER_LOG, FileGatewayTables.CONNECTION_LOG)));
+      FileGatewayTables.joins().forEach(output::add);
+      FileGatewayTables.childWidgets().forEach(output::add);
+      output.add(app);
+      FileGatewayProcesses.processes().forEach(output::add);
+      output.add(new QAlertTypeMetaData().withName("filegateway.lockout").withLabel("File Gateway Lockout")
+         .withSourceQBitName(qBit.getName()).withSubjectTableName(FileGatewayTables.ACCOUNT)
+         .withVisibilityPermission(FileGatewayPermissions.VIEW));
+      output.addSelfToInstance(qInstance);
+      ClientChannelsMetaData channels = ClientChannelsMetaData.ofOrWithNew(qInstance)
+         .withChannel("sftp", "SFTP file gateway").withDeniedPattern("sftp", "file_gateway_*")
+         .withDeniedPattern("assistant", "file_gateway_*");
+      for(String pattern : SFTP_DENIED_PATTERNS)
+      {
+         channels.withDeniedPattern("sftp", pattern);
+      }
+      for(String pattern : ClientChannelsMetaData.ASSISTANT_GENERIC_DENIED_PATTERNS)
+      {
+         channels.withDeniedPattern("sftp", pattern);
+      }
+      return (new MetaDataProducerMultiOutput());
    }
 }

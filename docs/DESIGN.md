@@ -390,7 +390,7 @@ Everything is streamed. Nothing is written to disk.
 - **Lockout.**
   - 5 failed auths within 15 minutes, per username or per IP, lock that username or IP for 30
     minutes. All three numbers are configurable.
-  - A lock sets `locked_until` and raises an alert (`file_gateway_lockout`, `QAlerts.raise`).
+  - A lock sets `locked_until` and raises an alert (`filegateway.lockout`, `QAlerts.raise`; core alert-type names use dots, not the table prefix).
   - The record action "Unlock account" clears it.
   - Lockout state lives in the database, so it holds across pods.
   - A per-IP limit on new connections (30 per minute) applies before auth.
