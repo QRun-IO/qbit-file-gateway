@@ -14,13 +14,12 @@ code and QInstance. Design: `docs/DESIGN.md`.
 ## Build commands
 
 ```bash
-./mvnw -o compile
-./mvnw -o test
-./mvnw -o verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
+./mvnw compile
+./mvnw test
+./mvnw verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
 ```
 
 Use the Maven 3.9.11 wrapper (Java 21); Maven 3.10 cannot read the parent POM. On Windows use `./mvnw.cmd`.
-Use the POM default `4.1.0-SNAPSHOT` from current QQQ develop, including preferences #1162 and invoker #1170.
 
 ## Architecture
 
@@ -96,7 +95,7 @@ directory is empty. The host supplies RDBMS; `qqq-backend-module-rdbms` must rem
 
 ## Dependencies
 
-Parent: `com.kingsrook:qbit-build-parent:2.0.0`. QQQ BOM: `4.1.0-SNAPSHOT` until 4.1.0-RC.6.
+Parent: `com.kingsrook:qbit-build-parent:2.0.0`. QQQ BOM: `4.1.0-RC.7` (first release with QRun-IO/qqq#1170); never a SNAPSHOT.
 Only allow-listed qbit API artifacts (`qbit-object-storage` `api` package) may be depended on.
 Notifications go through core `QAlerts.notify`, never qbit-alerts classes.
 

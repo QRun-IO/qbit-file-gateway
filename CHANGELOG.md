@@ -50,8 +50,8 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Compatibility
 
-- Local and CI builds use current QQQ develop via the POM default `4.1.0-SNAPSHOT`,
-  including preferences #1162 and invoker #1170. RDBMS remains host-provided at runtime.
+- Builds on QQQ `4.1.0-RC.7` (the first release with QRun-IO/qqq#1170). RDBMS remains a
+  host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
 - Object-storage RC.2 controls S3 part size through its connection configuration.
 - Core #1170 sends multipart process values without re-uploading the original file.
