@@ -1,55 +1,56 @@
-# QBit Template - Application
+# QBit File Gateway
 
-Template repository for creating **Application QBits** - complete, self-contained applications or major functional modules for the QQQ framework.
+An SFTP server for QQQ applications. Users and service accounts sign in with their SSH keys and see
+the application as a folder tree of apps and tables. Uploading a file into a table's
+`upload/<profile>/` folder runs a saved bulk-load profile as that user; getting a file from
+`views/` or `reports/` exports a saved view or runs a saved report. The gateway reaches data only
+through the `/qqq/v1` UI API with the signed-in user's own session (client channel `sftp`), so
+permissions, masking and audits apply exactly as in the UI. Design: [docs/DESIGN.md](docs/DESIGN.md).
 
-## When to Use This Template
+This repository currently holds the scaffold; the gateway is built in phases described in the design.
 
-Use this template when building:
-- Complete mini-applications (WMS, OMS, CRM)
-- Major functional modules with multiple tables
-- QBits that require UI navigation (QAppSection)
-- Self-contained features with business logic
+## Requirements
 
-## Quick Start
+Java 21 and QQQ 4.1.0-SNAPSHOT (UI API invoker and client channels, until 4.1.0-RC.6). The Maven
+wrapper pins Maven 3.9.11.
 
-Requires **Java 21**, **Maven 3.8+**, and QQQ **4.0.0**. Create a repository with **Use this template**, customize its Maven coordinates and Java package/classes, then run `mvn clean verify`. Follow the [Getting Started guide](docs/00-getting-started.md) for the full sequence.
+## Install
 
-## Structure
-
-```
-src/main/java/com/kingsrook/qbits/example/
-├── ExampleAppQBitConfig.java
-├── ExampleAppQBitProducer.java
-├── model/
-│   ├── ExampleEntity.java
-│   └── ExampleChildEntity.java
-├── processes/
-│   ├── ExampleProcessStep.java
-│   └── ExampleProcessMetaDataProducer.java
-└── widgets/
-    ├── ExampleDashboardWidgetRenderer.java
-    └── ExampleDashboardWidgetMetaDataProducer.java
+```xml
+<dependency>
+   <groupId>com.kingsrook.qbits</groupId>
+   <artifactId>qbit-file-gateway</artifactId>
+   <version>0.1.0-SNAPSHOT</version>
+</dependency>
 ```
 
-## Key Characteristics
+## Tables and permissions
 
-| Feature | Description |
-|---------|-------------|
-| QAppSection | Required - provides UI navigation |
-| Tables | Multiple interconnected business tables |
-| Processes | Full CRUD with business logic |
-| Widgets | Dashboard components |
-| Security | Permission key support |
-| Integration | Hooks for other QBits |
+Planned tables (none are produced yet), all prefixed `file_gateway_`: accounts, SSH keys, aliases,
+upload jobs, the transfer log and the connection log. Permissions use the full `file_gateway`
+prefix.
 
-## Documentation
+## Configuration
 
-- [Getting Started](docs/00-getting-started.md)
-- [Tables and Relationships](docs/01-tables-and-relationships.md)
-- [Processes](docs/02-processes.md)
-- [Widgets and UI](docs/03-widgets-and-ui.md)
+`FileGatewayQBitConfig` holds the optional `tableMetaDataCustomizer`, `sftpEnabled` (only the
+gateway deployment runs the server) and `sftpPort` (default 2222).
 
-## See Also
+## Adopting in another app
 
-- [qbit-template-extension](https://github.com/QRun-IO/qbit-template-extension) - For infrastructure extensions
-- [qbit-template-data](https://github.com/QRun-IO/qbit-template-data) - For reference data providers
+```java
+new FileGatewayQBitProducer()
+   .withQBitConfig(new FileGatewayQBitConfig())
+   .produce(qInstance);
+```
+
+## Build
+
+```bash
+./mvnw verify   # Checkstyle; JaCoCo 70% instructions, 90% classes
+```
+
+On Windows, use `./mvnw.cmd`.
+
+## License
+
+[Apache License 2.0](LICENSE). Copyright Kingsrook, LLC.
