@@ -109,7 +109,10 @@ class SftpIntegrationTest
             assertThat(names(ca, "/testapp/alpha/views")).containsExactlyInAnyOrder("all-orders.csv", "all-orders.xlsx");
             assertThat(names(ca, "/testapp/alpha/reports")).contains("daily-orders.csv", "daily-orders.xlsx");
             assertThat(ca.stat("/testapp/alpha/views/all-orders.csv").getSize()).isZero();
-            assertThatThrownBy(() -> ca.read("/testapp/alpha/views/all-orders.csv")).isInstanceOf(SftpException.class);
+            try(var download = ca.read("/testapp/alpha/views/all-orders.csv"))
+            {
+               assertThat(download.readAllBytes()).isNotEmpty();
+            }
             assertThatThrownBy(() -> ca.write("/testapp/alpha/test.csv")).isInstanceOf(SftpException.class);
             assertThatThrownBy(() -> ca.setStat("/testapp/alpha/views/all-orders.csv", new SftpClient.Attributes().modifyTime(0))).isInstanceOfSatisfying(SftpException.class,
                e -> assertThat(e.getStatus()).isEqualTo(SftpConstants.SSH_FX_PERMISSION_DENIED));
@@ -123,7 +126,7 @@ class SftpIntegrationTest
          }
          assertThat(harness.calls).isNotEmpty().allSatisfy(call ->
          {
-            String template = call.path().substring("/qqq/v1".length()).replaceAll("/table/[^/]+/query", "/table/{tableName}/query");
+            String template = call.path().substring("/qqq/v1".length()).replaceAll("/table/[^/]+/(query|export)", "/table/{tableName}/$1");
             assertThat(harness.runtime.getInvoker().findOperation(HttpMethod.valueOf(call.method()), template)).isPresent();
             assertThat(call.channel()).startsWith("sftp/");
             assertThat(call.invokedBy()).isEqualTo("file-gateway");

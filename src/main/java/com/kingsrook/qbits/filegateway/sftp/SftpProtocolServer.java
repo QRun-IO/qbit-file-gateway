@@ -37,6 +37,7 @@ import com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore;
 import com.kingsrook.qbits.filegateway.upload.UploadJobs;
 import com.kingsrook.qbits.filegateway.vfs.GatewayFileSystem;
 import com.kingsrook.qbits.filegateway.vfs.GatewayUiApiClient;
+import com.kingsrook.qbits.filegateway.vfs.GeneratedDownloads;
 import com.kingsrook.qbits.filegateway.vfs.VirtualTree;
 import com.kingsrook.qqq.backend.core.logging.QLogger;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
@@ -108,7 +109,18 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
       server.setCommandFactory(null);
       server.setForwardingFilter(RejectAllForwardingFilter.INSTANCE);
       server.setAgentFactory(null);
-      server.setSubsystemFactories(List.of(new SftpSubsystemFactory.Builder().withFileSystemAccessor(new org.apache.sshd.sftp.server.SftpFileSystemAccessor()
+      server.setSubsystemFactories(List.of(new SftpSubsystemFactory.Builder().withSftpErrorStatusDataHandler(new org.apache.sshd.sftp.server.SftpErrorStatusDataHandler()
+      {
+         /*******************************************************************************
+          ** Preserve actionable gateway and UI API errors in SFTP failure responses.
+          *******************************************************************************/
+         @Override
+         public String resolveErrorMessage(org.apache.sshd.sftp.server.SftpSubsystemEnvironment subsystem, int id, Throwable error, int status, int command, Object... args)
+         {
+            return (error instanceof IOException && error.getMessage() != null ? error.getMessage()
+               : org.apache.sshd.sftp.common.SftpHelper.resolveStatusMessage(status));
+         }
+      }).withFileSystemAccessor(new org.apache.sshd.sftp.server.SftpFileSystemAccessor()
       {
          /*******************************************************************************
           ** MINA must use our seekable channels, not the native FileChannel default.
@@ -140,7 +152,9 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
          public FileSystem createFileSystem(SessionContext session)
          {
             GatewaySession state = session.getAttribute(GatewaySession.ATTRIBUTE);
-            return (new GatewayFileSystem(new VirtualTree(new GatewayUiApiClient(invoker, state), state, audit, clock).withUploads(new UploadJobs(audit, store, config, clock), store)));
+            GatewayUiApiClient client = new GatewayUiApiClient(invoker, state);
+            return (new GatewayFileSystem(new VirtualTree(client, state, audit, clock).withUploads(new UploadJobs(audit, store, config, clock), store)
+               .withDownloads(new GeneratedDownloads(client, state, audit, config, clock, instance))));
          }
       });
       server.addSessionListener(new SessionListener()

@@ -22,6 +22,7 @@ package com.kingsrook.qbits.filegateway.vfs;
 
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.NoSuchFileException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,6 +35,7 @@ import com.kingsrook.qqq.backend.core.model.actions.tables.query.QQueryFilter;
 import com.kingsrook.qqq.middleware.javalin.specs.invoke.UiApiCredentials;
 import com.kingsrook.qqq.middleware.javalin.specs.invoke.UiApiInvoker;
 import com.kingsrook.qqq.middleware.javalin.specs.invoke.UiApiRequest;
+import com.kingsrook.qqq.middleware.javalin.specs.invoke.UiApiStreamResponse;
 import com.kingsrook.qqq.openapi.model.HttpMethod;
 
 
@@ -94,7 +96,7 @@ public class GatewayUiApiClient
    /*******************************************************************************
     ** Apply the fixed channel identity, credentials and contract check on every call.
     *******************************************************************************/
-   protected JsonNode invoke(UiApiRequest request) throws IOException
+   public JsonNode invoke(UiApiRequest request) throws IOException
    {
       if(invoker.findOperation(request.getMethod(), request.getPath()).isEmpty())
       {
@@ -110,13 +112,48 @@ public class GatewayUiApiClient
          }
          if(response.getStatus() == 401 || response.getStatus() == 403)
          {
-            throw (new AccessDeniedException(request.getPath()));
+            throw (new AccessDeniedException(request.getPath(), null, response.getBody()));
          }
          if(!response.isSuccess())
          {
-            throw (new IOException("UI API request failed with status " + response.getStatus()));
+            throw (new IOException("UI API request failed with status " + response.getStatus() + ": " + response.getBody()));
          }
          return (response.getJson());
+      }
+      catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+      {
+         throw (new IOException("User session unavailable", e));
+      }
+   }
+
+
+
+   /*******************************************************************************
+    ** Open a binary response as this user, retaining only a bounded error body.
+    *******************************************************************************/
+   public UiApiStreamResponse stream(UiApiRequest request) throws IOException
+   {
+      if(invoker.findOperation(request.getMethod(), request.getPath()).isEmpty())
+      {
+         throw (new IOException("Gateway requires a spec-defined UI API operation"));
+      }
+      try
+      {
+         UiApiStreamResponse response = invoker.invokeForStream(request.withCredentials(UiApiCredentials.ofInProcessSession(session.token()))
+            .withInvokedBy("file-gateway").withClientDetail(session.id));
+         if(response.isSuccess())
+         {
+            return (response);
+         }
+         try(response)
+         {
+            String error = new String(response.getInputStream().readNBytes(65536), StandardCharsets.UTF_8);
+            if(response.getStatus() == 401 || response.getStatus() == 403)
+            {
+               throw (new AccessDeniedException(request.getPath(), null, error));
+            }
+            throw (new IOException("UI API request failed with status " + response.getStatus() + ": " + error));
+         }
       }
       catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
       {

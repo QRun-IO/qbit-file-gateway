@@ -51,10 +51,18 @@ Claims compare expected status under an account-row transaction; core's optimist
 alone does not add a SQL WHERE guard. Fresh worker user sessions outlive SSH connections and are
 revoked after delivery. Bulk process multipart field: `theFile`; mapping frontend step: `fileMapping`
 (resumes `receiveFileMapping`). RC.2 object storage owns S3 part size at connection level. The
-private invoker selects multipart only when a file part is present, so the mapping request
-restreams the file with its values. See README adoption prerequisites and compatibility notes.
+private invoker supports multipart process values without a file part, so the mapping request
+sends only its values. See README adoption prerequisites and compatibility notes.
 
-Saved-view/report downloads, endpoint routing/chroot, outbox delivery, Quick Search/ESB,
+Phase (c) adds `GeneratedDownloads` (user-scoped export/render/download API flow and durable
+account-locked download quotas) and `GeneratedReadChannel` (fixed rolling window, no spool).
+Saved-view JSON uses `queryFilter.orderBys` and `queryColumns.columns` visibility/order. Generated
+stat size is zero; reads fill requests until real EOF to avoid MINA's short-read EOF inference.
+Reports list only with a configured render-process storage table. FieldSecurityLock DENY tests
+require `enforcePermissionsInCoreActions=true` and match direct same-user UI export bytes.
+Core `RenderSavedReportExecuteStep` currently uses a temporary file; fully disk-free report
+rendering is a core follow-up, and the snapshot guard cannot detect transient files.
+Endpoint routing/chroot, outbox delivery, Quick Search/ESB,
 preferences, retention and the app home belong to later phases. The core-valid alert type is `filegateway.lockout`; the design's
 underscore-only name is rejected by core validation.
 
