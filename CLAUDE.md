@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Guidance for coding agents working in this repository.
 
@@ -14,13 +14,13 @@ code and QInstance. Design: `docs/DESIGN.md`.
 ## Build commands
 
 ```bash
-./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT compile
-./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT test
-./mvnw -o -Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
+./mvnw -o compile
+./mvnw -o test
+./mvnw -o verify  # Checkstyle; JaCoCo: 70% instructions, 90% classes
 ```
 
-Use the Maven 3.9.11 wrapper (Java 21); Maven 3.10 cannot read the parent POM. On Windows use `./mvnw.cmd` and quote the `-Dqqq.snapshot.version=4.1.0-FG-SNAPSHOT` argument in PowerShell.
-Keep the POM default at `4.1.0-SNAPSHOT` for CI; the private version prevents local artifact replacement.
+Use the Maven 3.9.11 wrapper (Java 21); Maven 3.10 cannot read the parent POM. On Windows use `./mvnw.cmd`.
+Use the POM default `4.1.0-SNAPSHOT` from current QQQ develop, including preferences #1162 and invoker #1170.
 
 ## Architecture
 
@@ -69,8 +69,12 @@ Phase (e) adds endpoints and chroot (`AliasCustomizer` validates paths), `outbox
 decrypt/encrypt, keys in memory), `maintenance/` (daily retention process and record-action
 effects), `FileGatewayHome` (typed STATISTICS and TABLE widgets only; guardrail G5),
 `FileGatewayIntegrations` (ESB, Quick Search, API lists) and `file_gateway_server` heartbeats.
-The Preferences "File transfer" section waits for QRun-IO/qqq#1162. The k8s example is in
-`docs/k8s/`.
+The `file-transfer` Preferences section requires only `file_gateway.connect`. Its provider uses
+core's trusted scope with the original session, derives identity only from the request context,
+and manages the caller's unrevoked USER-account keys through normal table actions. Add key
+creates an account on first use; Revoke sets `revoked_at`; PATCH edits labels and expiry.
+Optional `publicHostName` advertises the hostname; port/fingerprint use the latest heartbeat.
+The k8s example is in `docs/k8s/`.
 
 Tests run a strict UI API server, H2 from the adopter DDL and real MINA clients. NoDiskExtension
 snapshots the working tree (excluding target) and isolated test home, and asserts the test temp

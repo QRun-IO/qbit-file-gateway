@@ -265,13 +265,30 @@ has no token.
 - **Who needs it.** It is a qbit-authentik PR. The gateway works without it under MOCK auth and in
   tests, but kof22 needs it before going live.
 
-### 3.5 Preferences (QRun-IO/qqq#1162)
-The gateway registers a "File transfer" section with the provider `FileTransferPreferencesProvider`.
+### 3.5 Preferences
+The gateway registers `file-transfer` ("File transfer", order 60) with
+`FileTransferPreferencesProvider`, using core's user-preferences API. Only users with
+`file_gateway.connect` see it; no admin-app or backing-table permissions are needed.
 
-- **Scalar fields:** the SFTP username (read-only), "Add a public key" (TEXT) and "Key label".
-- **The `keys` list:** label, fingerprint (read-only), last used (read-only), expires and revoked.
-- **Behaviour.** The first key creates the user's `USER` account. Revoking a key sets `revoked_at`.
-- **Until #1162 is in the baseline,** admins add keys on the account record.
+- **Read-only connection details:** the account username, plus port and host key fingerprint from
+  the most recent `file_gateway_server` heartbeat. The optional `publicHostName` config supplies the host; when
+  unset, the host field is omitted. Before the first key, username is blank and the keys list
+  explains that adding a key creates the account.
+- **The `keys` list:** only the caller's unrevoked USER-account keys. Label and expiry are editable
+  through PATCH; fingerprint, key type and last-used time are read-only. Public-key text is never
+  returned in preference values.
+- **Add key (`addKey`, LIST action):** requires OpenSSH public-key text and a label, with optional
+  expiry. The first successful addition creates a USER account with FULL_TREE and configured
+  account defaults. Its login is derived from the session user ID, normalized to lowercase
+  `[a-z0-9._-]`, at most 64 characters; short IDs receive a `user-` prefix. Collisions receive
+  `-2`, `-3`, etc. Subsequent keys reuse that account. The result names the computed fingerprint.
+- **Revoke (`revokeKey`, ROW action):** confirms revocation, sets `revoked_at`, and removes the
+  key from the list. New logins fail immediately; existing sessions end on the next gateway poll.
+- **Persistence:** ordinary table actions retain `SshKeyCustomizer` validation and configured
+  audits under the original user/client channel. Weak and duplicate keys return actionable 400
+  messages. Failed first-key inserts roll back account creation. Mutations lock and recheck
+  ownership; another user's key is not a setting here. Identity comes only from core's request
+  context, never from the request body. Service-account keys remain administrator-managed.
 
 ## 4. Upload
 1. **Receive.** The SFTP write streams straight to object storage:
@@ -569,6 +586,7 @@ FileGatewayConsumersMetaData.ofOrWithNew(qInstance).withConsumer(new QCodeRefere
   - `sftpEnabled` (default false; true only in the gateway deployment, from
     `FILE_GATEWAY_SFTP_ENABLED`);
   - `sftpPort` (2222);
+  - `publicHostName` (null; optional public hostname shown in Preferences);
   - `hostKeyEnvVarName` (`FILE_GATEWAY_SSH_HOST_KEY`);
   - `allowGeneratedHostKey` (false).
 - **Storage and buffers:**
@@ -679,7 +697,7 @@ All tests run in the qbit's build.
 - **G2.** Server tests run in strict mode.
 - **G3.** No extension is registered: the gateway is a UI API client.
 - **G4.** Stand-ins are marked `STAND-IN(core=..., removeBy=...)`: the 4.1.0-SNAPSHOT baseline
-  until RC.6, and the preferences section until #1162.
+  until RC.6. The preferences section uses the implemented core API.
 - **G5.** No HTML widgets.
 - **G7.** Pin 4.1.0-RC.6 as soon as it is cut. Until then, develop builds on the SNAPSHOT.
 
