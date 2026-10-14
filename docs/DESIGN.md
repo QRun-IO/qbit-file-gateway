@@ -608,7 +608,7 @@ The gateway is a separate, stateless Deployment of the same image. An example is
   - Liveness: HTTP health.
   - Startup: allows 2 minutes for the QInstance.
 - **Service.** `type: LoadBalancer`, with these settings:
-  - the annotation `lbipam.cilium.io/ips: 10.100.22.65` in kof22 (owner, 2026-10-13; .60, .61 and .64 are taken);
+  - the annotation `lbipam.cilium.io/ips` (or the older `io.cilium/lb-ipam-ips`, which k8s-galaxy uses): 10.100.22.65 in kof22 (owner, 2026-10-13; .60, .61 and .64 are taken);
   - **port 22 → 2222 only (no passive range in v1)**;
   - `externalTrafficPolicy: Local`, so the pod sees the real client IP for allowlists and
     lockouts.

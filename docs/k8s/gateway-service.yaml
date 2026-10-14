@@ -5,7 +5,8 @@ kind: Service
 metadata:
   name: <APP>-file-gateway
   annotations:
-    # Cilium LB-IPAM: a fixed address (kof22 on k8s-galaxy: 10.100.22.65, owner decision 2026-10-13)
+    # Cilium LB-IPAM: a fixed address (kof22 on k8s-galaxy: 10.100.22.65, owner decision 2026-10-13).
+    # Cilium 1.15+ reads lbipam.cilium.io/ips; older clusters (and k8s-galaxy manifests) use io.cilium/lb-ipam-ips.
     lbipam.cilium.io/ips: "10.100.22.65"
 spec:
   type: LoadBalancer
