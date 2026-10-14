@@ -178,3 +178,14 @@ CREATE TABLE file_gateway_server (
    started_at TIMESTAMP,
    last_seen_at TIMESTAMP
 );
+
+-- Indexes for the job queue, dedupe, live sessions, home queries and retention.
+CREATE INDEX file_gateway_transfer_log_account_date ON file_gateway_transfer_log (account_id, create_date);
+CREATE INDEX file_gateway_transfer_log_date ON file_gateway_transfer_log (create_date);
+CREATE INDEX file_gateway_connection_log_account_live ON file_gateway_connection_log (account_id, disconnected_at);
+CREATE INDEX file_gateway_connection_log_date ON file_gateway_connection_log (create_date);
+CREATE INDEX file_gateway_upload_job_status_next ON file_gateway_upload_job (status, next_attempt_at);
+CREATE INDEX file_gateway_upload_job_dedupe ON file_gateway_upload_job (account_id, sha256);
+CREATE INDEX file_gateway_upload_job_date ON file_gateway_upload_job (create_date);
+CREATE INDEX file_gateway_outbox_file_alias_status ON file_gateway_outbox_file (alias_id, status);
+CREATE INDEX file_gateway_ssh_key_account ON file_gateway_ssh_key (account_id);
