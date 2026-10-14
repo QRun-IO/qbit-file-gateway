@@ -274,6 +274,10 @@ class PhaseEIntegrationTest
          assertThat(((Number) ((StatisticsData) home.data("out", now)).getCount()).doubleValue()).isEqualTo(1);
          assertThat(((Number) ((StatisticsData) home.data("failures", now)).getCount()).intValue()).isEqualTo(1);
          assertThat(((TableData) home.data("recent", now)).getRows()).hasSize(1);
+         //////////////////////////////////////////////////////////////////
+         // readable at all widths: home tables declare no column widths //
+         //////////////////////////////////////////////////////////////////
+         assertThat(((TableData) home.data("recent", now)).getColumns()).allSatisfy(column -> assertThat(column.getWidth()).isNull());
          assertThat(((TableData) home.data("partners", now)).getRows()).hasSize(1);
          for(String widget : FileGatewayHome.KEYS)
          {
