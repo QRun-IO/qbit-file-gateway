@@ -35,13 +35,21 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 - Isolated consumer/outbox API contract and complete configuration for subsequent phases.
 - Real SFTP/strict UI API acceptance tests, no-disk guard, schema round trips and adoption docs.
 
+- Endpoints (aliases) with path validation and ENDPOINTS_ONLY chroot; BULK_LOAD, INBOX, VIEW,
+  REPORT and OUTBOX kinds.
+- The outbox provider (`FileGatewayOutbox.put`), outbox files, pickup tracking and `onDownloaded`.
+- Optional per-account PGP decryption of uploads and encryption of downloads.
+- The typed app home, `file_gateway_server` heartbeats, Unlock/Disable/Revoke/End session record
+  actions, the daily retention process and `FileGatewayIntegrations`.
+- Kubernetes example manifests in `docs/k8s/`.
+
 ### Compatibility
 
 - Local invoker integration builds use `4.1.0-FG-SNAPSHOT`; CI retains the POM's
   `4.1.0-SNAPSHOT` default. RDBMS remains a host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
-- Endpoint routing/chroot, outbox delivery and app home remain later
-  phases. Object-storage RC.2 controls S3 part size through its connection configuration.
+- Object-storage RC.2 controls S3 part size through its connection configuration.
+- The Preferences "File transfer" section waits for QRun-IO/qqq#1162.
 - Private core #1170 sends multipart process values without re-uploading the original file.
 - FieldSecurityLock requires core permission enforcement enabled. Saved-report rendering still
   uses a temporary file inside core; fully disk-free report generation needs a core change.

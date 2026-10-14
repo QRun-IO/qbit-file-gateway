@@ -108,7 +108,7 @@ public final class GeneratedDownloads
          }
          String prefix = node.path().substring(0, node.path().lastIndexOf('/'));
          prefix = prefix.substring(0, prefix.lastIndexOf('/'));
-         String table = prefix.substring(prefix.lastIndexOf('/') + 1);
+         String table = node.job() == null ? prefix.substring(prefix.lastIndexOf('/') + 1) : node.job().getValueString("tableName");
          JsonNode record = null;
          for(JsonNode row : client.savedObjects("VIEW".equals(node.kind()) ? "savedView" : "savedReport", table))
          {
@@ -250,7 +250,7 @@ public final class GeneratedDownloads
        *******************************************************************************/
       private Transfer(VirtualTree.Node node) throws IOException
       {
-         format = node.path().substring(node.path().lastIndexOf('.') + 1);
+         format = node.job() == null ? node.path().substring(node.path().lastIndexOf('.') + 1) : node.job().getValueString("format");
          try
          {
             row = audit.insert(FileGatewayTables.TRANSFER_LOG, new QRecord().withValue("accountId", session.account.getValue("id"))

@@ -70,6 +70,11 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
    private final SshKeyAuthenticator authenticator;
    private final Duration pollInterval;
    private ScheduledExecutorService poller;
+   private final AuditWriter heartbeatAudit;
+   private final Clock heartbeatClock;
+   private final String heartbeatPod;
+   private final String hostFingerprint;
+   private java.time.Instant startedAt;
 
 
 
@@ -89,7 +94,13 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
    public SftpProtocolServer(QInstance instance, FileGatewayQBitConfig config, UiApiInvoker invoker, KeyPair hostKey, Clock clock, Duration pollInterval, String podName, GatewayObjectStore store)
    {
       this.pollInterval = pollInterval;
+      heartbeatAudit = new AuditWriter(instance);
+      heartbeatClock = clock;
+      heartbeatPod = podName == null ? java.util.UUID.randomUUID().toString() : podName;
+      hostFingerprint = org.apache.sshd.common.config.keys.KeyUtils.getFingerPrint(org.apache.sshd.common.digest.BuiltinDigests.sha256, hostKey.getPublic());
       AuditWriter audit = new AuditWriter(instance);
+      var outbox = new com.kingsrook.qbits.filegateway.outbox.OutboxService(instance, store, config, clock);
+      com.kingsrook.qbits.filegateway.api.FileGatewayOutbox.setProvider(outbox);
       authenticator = new SshKeyAuthenticator(instance, config, audit, clock, podName);
       server = SshServer.setUpDefaultServer();
       server.setPort(config.getSftpPort());
@@ -154,7 +165,7 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
             GatewaySession state = session.getAttribute(GatewaySession.ATTRIBUTE);
             GatewayUiApiClient client = new GatewayUiApiClient(invoker, state);
             return (new GatewayFileSystem(new VirtualTree(client, state, audit, clock).withUploads(new UploadJobs(audit, store, config, clock), store)
-               .withDownloads(new GeneratedDownloads(client, state, audit, config, clock, instance))));
+               .withDownloads(new GeneratedDownloads(client, state, audit, config, clock, instance)).withOutbox(outbox)));
          }
       });
       server.addSessionListener(new SessionListener()
@@ -225,6 +236,16 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
    public void start() throws IOException
    {
       server.start();
+      startedAt = heartbeatClock.instant();
+      try
+      {
+         heartbeat();
+      }
+      catch(com.kingsrook.qqq.backend.core.exceptions.QException e)
+      {
+         server.stop(true);
+         throw (new IOException("Unable to publish gateway heartbeat", e));
+      }
       poller = Executors.newSingleThreadScheduledExecutor(runnable ->
       {
          Thread thread = new Thread(runnable, "file-gateway-revocation");
@@ -236,6 +257,7 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
          try
          {
             authenticator.poll();
+            heartbeat();
          }
          catch(Exception e)
          {
@@ -243,6 +265,28 @@ public class SftpProtocolServer implements FileGatewayProtocolServer
             server.getActiveSessions().forEach(session -> session.close(true));
          }
       }, pollInterval.toMillis(), pollInterval.toMillis(), TimeUnit.MILLISECONDS);
+   }
+
+
+
+   /*******************************************************************************
+    ** Publish host identity to the database for app homes in other deployments.
+    *******************************************************************************/
+   public void heartbeat() throws com.kingsrook.qqq.backend.core.exceptions.QException
+   {
+      var rows = heartbeatAudit.query(com.kingsrook.qbits.filegateway.metadata.FileGatewayTables.SERVER,
+         UploadJobs.equal("podName", heartbeatPod));
+      var values = new com.kingsrook.qqq.backend.core.model.data.QRecord().withValue("podName", heartbeatPod)
+         .withValue("hostKeyFingerprint", hostFingerprint).withValue("port", server.getPort())
+         .withValue("startedAt", startedAt).withValue("lastSeenAt", heartbeatClock.instant());
+      if(rows.isEmpty())
+      {
+         heartbeatAudit.insert(com.kingsrook.qbits.filegateway.metadata.FileGatewayTables.SERVER, values);
+      }
+      else
+      {
+         heartbeatAudit.update(com.kingsrook.qbits.filegateway.metadata.FileGatewayTables.SERVER, values.withValue("id", rows.getFirst().getValue("id")));
+      }
    }
 
 

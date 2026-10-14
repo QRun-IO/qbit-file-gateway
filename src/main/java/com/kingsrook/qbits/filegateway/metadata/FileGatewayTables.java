@@ -62,9 +62,10 @@ public final class FileGatewayTables
    public static final String OUTBOX_FILE = "file_gateway_outbox_file";
    public static final String TRANSFER_LOG = "file_gateway_transfer_log";
    public static final String CONNECTION_LOG = "file_gateway_connection_log";
-   public static final List<String> ALL = List.of(ACCOUNT, SSH_KEY, ALIAS, UPLOAD_JOB, OUTBOX_FILE, TRANSFER_LOG, CONNECTION_LOG);
+   public static final String SERVER = "file_gateway_server";
+   public static final List<String> ALL = List.of(ACCOUNT, SSH_KEY, ALIAS, UPLOAD_JOB, OUTBOX_FILE, TRANSFER_LOG, CONNECTION_LOG, SERVER);
    public static final List<String> MAIN = List.of(ACCOUNT, ALIAS, UPLOAD_JOB, TRANSFER_LOG, CONNECTION_LOG);
-   public static final List<String> SYSTEM_WRITTEN = List.of(UPLOAD_JOB, OUTBOX_FILE, TRANSFER_LOG, CONNECTION_LOG);
+   public static final List<String> SYSTEM_WRITTEN = List.of(UPLOAD_JOB, OUTBOX_FILE, TRANSFER_LOG, CONNECTION_LOG, SERVER);
 
 
 
@@ -112,12 +113,45 @@ public final class FileGatewayTables
 
 
 
+   /** Plain labels for child lists and their record-screen tabs. */
+   static final java.util.Map<String, String> CHILD_LABELS = java.util.Map.of(
+      SSH_KEY, "SSH keys", UPLOAD_JOB, "Upload jobs", CONNECTION_LOG, "Connections",
+      TRANSFER_LOG, "Transfers", OUTBOX_FILE, "Outbox files");
+
+   /** Plain field labels where the name-derived label reads badly. */
+   static final java.util.Map<String, String> FIELD_LABELS = java.util.Map.ofEntries(
+      java.util.Map.entry("allowedCidrs", "Allowed CIDRs"), java.util.Map.entry("userId", "User"),
+      java.util.Map.entry("ownerUserId", "Owner"), java.util.Map.entry("maxFileSizeMb", "Max file size (MB)"),
+      java.util.Map.entry("maxUploadMbPerDay", "Max upload per day (MB)"), java.util.Map.entry("maxDownloadMbPerDay", "Max download per day (MB)"),
+      java.util.Map.entry("lastLoginIp", "Last login IP"), java.util.Map.entry("lastUsedIp", "Last used IP"),
+      java.util.Map.entry("pgpPublicKey", "PGP public key"), java.util.Map.entry("pgpDecryptUploads", "Decrypt PGP uploads"),
+      java.util.Map.entry("pgpEncryptDownloads", "Encrypt downloads with PGP"), java.util.Map.entry("remoteIp", "Remote IP"),
+      java.util.Map.entry("remoteAddress", "Remote IP"), java.util.Map.entry("sha256", "SHA-256"),
+      java.util.Map.entry("processUuid", "Process UUID"), java.util.Map.entry("savedBulkLoadProfileId", "Bulk load profile"),
+      java.util.Map.entry("savedViewId", "Saved view"), java.util.Map.entry("savedReportId", "Saved report"),
+      java.util.Map.entry("sizeBytes", "Size (bytes)"), java.util.Map.entry("accountId", "Account"),
+      java.util.Map.entry("aliasId", "Endpoint"), java.util.Map.entry("connectionLogId", "Connection"),
+      java.util.Map.entry("hostKeyFingerprint", "Host key fingerprint"), java.util.Map.entry("keyFingerprint", "Key fingerprint"));
+
+
+
    /*******************************************************************************
     ** Build all seven tables.
     *******************************************************************************/
    public static List<QTableMetaData> tables(FileGatewayQBitConfig config)
    {
-      return (List.of(account(config), ssh_key(config), alias(config), upload_job(config), outbox_file(config), transfer_log(config), connection_log(config)));
+      List<QTableMetaData> tables = List.of(account(config), ssh_key(config), alias(config), upload_job(config), outbox_file(config), transfer_log(config), connection_log(config), server(config));
+      for(QTableMetaData table : tables)
+      {
+         for(QFieldMetaData field : table.getFields().values())
+         {
+            if(FIELD_LABELS.containsKey(field.getName()))
+            {
+               field.setLabel(FIELD_LABELS.get(field.getName()));
+            }
+         }
+      }
+      return (tables);
    }
 
 
@@ -160,7 +194,7 @@ public final class FileGatewayTables
          .withField(field("userId", QFieldType.STRING).withIsRequired(true))
          .withField(field("ownerUserId", QFieldType.STRING))
          .withField(field("status", QFieldType.STRING).withPossibleValueSourceName("file_gateway_account_status").withDefaultValue("ACTIVE").withIsRequired(true))
-         .withField(field("rootMode", QFieldType.STRING).withPossibleValueSourceName("file_gateway_root_mode").withDefaultValue("FULL_TREE").withIsRequired(true))
+         .withField(field("rootMode", QFieldType.STRING).withPossibleValueSourceName("file_gateway_root_mode"))
          .withField(field("allowedCidrs", QFieldType.TEXT))
          .withField(field("expiresAt", QFieldType.DATE_TIME))
          .withField(field("formats", QFieldType.STRING).withDefaultValue("csv,xlsx"))
@@ -187,9 +221,9 @@ public final class FileGatewayTables
       table.withSection(SectionFactory.defaultT1("id", "username", "label", "accountType", "userId", "ownerUserId"));
       table.withSection(SectionFactory.defaultT2("status", "rootMode", "allowedCidrs", "expiresAt", "formats", "maxConcurrentSessions", "maxOperationsPerMinute", "maxFileSizeMb", "maxUploadMbPerDay", "maxDownloadMbPerDay", "dedupeUploads", "notifyOnSuccess", "pgpPublicKey", "pgpDecryptUploads", "pgpEncryptDownloads", "operationWindowAt", "operationWindowCount", "failedLoginCount", "failedLoginWindowAt", "lockedUntil", "lastLoginAt", "lastLoginIp"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
-      table.withSection(SectionFactory.customT2(SSH_KEY, new QIcon("list")).withWidgetName(ACCOUNT + "_children_" + SSH_KEY));
-      table.withSection(SectionFactory.customT2(UPLOAD_JOB, new QIcon("list")).withWidgetName(ACCOUNT + "_children_" + UPLOAD_JOB));
-      table.withSection(SectionFactory.customT2(CONNECTION_LOG, new QIcon("list")).withWidgetName(ACCOUNT + "_children_" + CONNECTION_LOG));
+      table.withSection(SectionFactory.customT2(SSH_KEY, new QIcon("list")).withLabel(CHILD_LABELS.get(SSH_KEY)).withWidgetName(ACCOUNT + "_children_" + SSH_KEY));
+      table.withSection(SectionFactory.customT2(UPLOAD_JOB, new QIcon("list")).withLabel(CHILD_LABELS.get(UPLOAD_JOB)).withWidgetName(ACCOUNT + "_children_" + UPLOAD_JOB));
+      table.withSection(SectionFactory.customT2(CONNECTION_LOG, new QIcon("list")).withLabel(CHILD_LABELS.get(CONNECTION_LOG)).withWidgetName(ACCOUNT + "_children_" + CONNECTION_LOG));
       return (table);
    }
 
@@ -246,11 +280,13 @@ public final class FileGatewayTables
          .withField(field("description", QFieldType.TEXT));
       table.withUniqueKey(new UniqueKey("name"));
       table.withUniqueKey(new UniqueKey("path"));
+      table.withCustomizer(TableCustomizers.PRE_INSERT_RECORD, new QCodeReference(AliasCustomizer.class));
+      table.withCustomizer(TableCustomizers.PRE_UPDATE_RECORD, new QCodeReference(AliasCustomizer.class));
       table.withSection(SectionFactory.defaultT1("id", "name", "path", "kind", "accountId", "tableName"));
       table.withSection(SectionFactory.defaultT2("savedBulkLoadProfileId", "savedViewId", "savedReportId", "format", "fileName", "consumerName", "isActive", "description"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
-      table.withSection(SectionFactory.customT2(UPLOAD_JOB, new QIcon("list")).withWidgetName(ALIAS + "_children_" + UPLOAD_JOB));
-      table.withSection(SectionFactory.customT2(OUTBOX_FILE, new QIcon("list")).withWidgetName(ALIAS + "_children_" + OUTBOX_FILE));
+      table.withSection(SectionFactory.customT2(UPLOAD_JOB, new QIcon("list")).withLabel(CHILD_LABELS.get(UPLOAD_JOB)).withWidgetName(ALIAS + "_children_" + UPLOAD_JOB));
+      table.withSection(SectionFactory.customT2(OUTBOX_FILE, new QIcon("list")).withLabel(CHILD_LABELS.get(OUTBOX_FILE)).withWidgetName(ALIAS + "_children_" + OUTBOX_FILE));
       return (table);
    }
 
@@ -284,6 +320,9 @@ public final class FileGatewayTables
          .withField(field("resultSummary", QFieldType.TEXT))
          .withField(field("resultsStorageKey", QFieldType.STRING))
          .withField(field("resultsSizeBytes", QFieldType.LONG))
+         .withField(field("plaintextStorageKey", QFieldType.STRING))
+         .withField(field("plaintextSha256", QFieldType.STRING))
+         .withField(field("plaintextSizeBytes", QFieldType.LONG))
          .withField(field("errorMessage", QFieldType.TEXT))
          .withField(field("attempts", QFieldType.INTEGER))
          .withField(field("nextAttemptAt", QFieldType.DATE_TIME))
@@ -294,9 +333,9 @@ public final class FileGatewayTables
          .withField(field("finishedAt", QFieldType.DATE_TIME))
          .withField(field("acknowledgedAt", QFieldType.DATE_TIME));
       table.withSection(SectionFactory.defaultT1("id", "accountId", "aliasId", "connectionLogId", "remoteAddress", "tableName"));
-      table.withSection(SectionFactory.defaultT2("savedBulkLoadProfileId", "consumerName", "consumerReference", "path", "fileName", "sizeBytes", "sha256", "storageKey", "status", "duplicateOfJobId", "processUuid", "insertedCount", "errorCount", "resultSummary", "resultsStorageKey", "resultsSizeBytes", "errorMessage", "attempts", "nextAttemptAt", "claimedBy", "claimedAt", "queuedAt", "startedAt", "finishedAt", "acknowledgedAt"));
+      table.withSection(SectionFactory.defaultT2("savedBulkLoadProfileId", "consumerName", "consumerReference", "path", "fileName", "sizeBytes", "sha256", "storageKey", "status", "duplicateOfJobId", "processUuid", "insertedCount", "errorCount", "resultSummary", "resultsStorageKey", "resultsSizeBytes", "plaintextStorageKey", "plaintextSha256", "plaintextSizeBytes", "errorMessage", "attempts", "nextAttemptAt", "claimedBy", "claimedAt", "queuedAt", "startedAt", "finishedAt", "acknowledgedAt"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
-      table.withSection(SectionFactory.customT2(TRANSFER_LOG, new QIcon("list")).withWidgetName(UPLOAD_JOB + "_children_" + TRANSFER_LOG));
+      table.withSection(SectionFactory.customT2(TRANSFER_LOG, new QIcon("list")).withLabel(CHILD_LABELS.get(TRANSFER_LOG)).withWidgetName(UPLOAD_JOB + "_children_" + TRANSFER_LOG));
       table.withoutCapabilities(Capability.TABLE_INSERT, Capability.TABLE_UPDATE, Capability.TABLE_DELETE);
       return (table);
    }
@@ -318,11 +357,12 @@ public final class FileGatewayTables
          .withField(field("status", QFieldType.STRING).withPossibleValueSourceName("file_gateway_outbox_status"))
          .withField(field("firstDownloadedAt", QFieldType.DATE_TIME))
          .withField(field("downloadCount", QFieldType.INTEGER))
+         .withField(field("onDownloadedPending", QFieldType.BOOLEAN).withDefaultValue(false))
          .withField(field("removedAt", QFieldType.DATE_TIME))
          .withField(field("expiresAt", QFieldType.DATE_TIME))
          .withField(field("createdByConsumer", QFieldType.STRING));
       table.withSection(SectionFactory.defaultT1("id", "aliasId", "fileName", "sizeBytes", "sha256", "storageKey"));
-      table.withSection(SectionFactory.defaultT2("status", "firstDownloadedAt", "downloadCount", "removedAt", "expiresAt", "createdByConsumer"));
+      table.withSection(SectionFactory.defaultT2("status", "firstDownloadedAt", "downloadCount", "onDownloadedPending", "removedAt", "expiresAt", "createdByConsumer"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
       table.withoutCapabilities(Capability.TABLE_INSERT, Capability.TABLE_UPDATE, Capability.TABLE_DELETE);
       return (table);
@@ -378,16 +418,36 @@ public final class FileGatewayTables
          .withField(field("connectedAt", QFieldType.DATE_TIME))
          .withField(field("lastSeenAt", QFieldType.DATE_TIME))
          .withField(field("disconnectedAt", QFieldType.DATE_TIME))
+         .withField(field("endRequestedAt", QFieldType.DATE_TIME))
          .withField(field("disconnectReason", QFieldType.TEXT))
          .withField(field("bytesIn", QFieldType.LONG))
          .withField(field("bytesOut", QFieldType.LONG))
          .withField(field("operationCount", QFieldType.LONG))
          .withField(field("clientChannel", QFieldType.STRING));
       table.withSection(SectionFactory.defaultT1("id", "accountId", "username", "remoteIp", "clientVersion", "keyFingerprint"));
-      table.withSection(SectionFactory.defaultT2("outcome", "sessionId", "podName", "connectedAt", "lastSeenAt", "disconnectedAt", "disconnectReason", "bytesIn", "bytesOut", "operationCount", "clientChannel"));
+      table.withSection(SectionFactory.defaultT2("outcome", "sessionId", "podName", "connectedAt", "lastSeenAt", "disconnectedAt", "endRequestedAt", "disconnectReason", "bytesIn", "bytesOut", "operationCount", "clientChannel"));
       table.withSection(SectionFactory.defaultT3("createDate", "modifyDate"));
       table.withoutCapabilities(Capability.TABLE_INSERT, Capability.TABLE_UPDATE, Capability.TABLE_DELETE);
       return (table);
+   }
+
+
+
+   /*******************************************************************************
+    ** Gateway heartbeat shared with the main web deployment, never a navigation table.
+    *******************************************************************************/
+   private static QTableMetaData server(FileGatewayQBitConfig config)
+   {
+      return (base(config, SERVER, "Servers").withRecordLabelFormatAndFields("%s", "podName")
+         .withField(field("podName", QFieldType.STRING).withIsRequired(true))
+         .withField(field("hostKeyFingerprint", QFieldType.STRING))
+         .withField(field("port", QFieldType.INTEGER))
+         .withField(field("startedAt", QFieldType.DATE_TIME))
+         .withField(field("lastSeenAt", QFieldType.DATE_TIME))
+         .withUniqueKey(new UniqueKey("podName"))
+         .withSection(SectionFactory.defaultT1("id", "podName", "hostKeyFingerprint", "port", "startedAt", "lastSeenAt"))
+         .withSection(SectionFactory.defaultT3("createDate", "modifyDate"))
+         .withoutCapabilities(Capability.TABLE_INSERT, Capability.TABLE_UPDATE, Capability.TABLE_DELETE));
    }
 
 
@@ -423,7 +483,7 @@ public final class FileGatewayTables
       for(QJoinMetaData join : joins())
       {
          widgets.add(ChildRecordListRenderer.widgetMetaDataBuilder(join)
-            .withName(join.getLeftTable() + "_children_" + join.getRightTable()).withLabel(join.getRightTable().replace("file_gateway_", "").replace("_", " "))
+            .withName(join.getLeftTable() + "_children_" + join.getRightTable()).withLabel(CHILD_LABELS.getOrDefault(join.getRightTable(), join.getRightTable()))
             .withCanAddChildRecord(SSH_KEY.equals(join.getRightTable())).withMaxRows(100)
             .getWidgetMetaData().withGridColumns(12).withPermissionRules(permissionRules(join.getRightTable())));
       }

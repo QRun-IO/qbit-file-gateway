@@ -364,7 +364,7 @@ public class SshKeyAuthenticator implements PublickeyAuthenticator, FileGatewayA
          QRecord connection = first(FileGatewayTables.CONNECTION_LOG, "id", state.connectionId);
          if(account == null || key == null || !"ACTIVE".equals(account.getValueString("status"))
             || expired(account, "expiresAt") || expired(key, "expiresAt") || key.getValue("revokedAt") != null
-            || connection == null || connection.getValue("disconnectedAt") != null)
+            || connection == null || connection.getValue("disconnectedAt") != null || connection.getValue("endRequestedAt") != null)
          {
             state.disconnectReason = connection != null && connection.getValueString("disconnectReason") != null
                ? connection.getValueString("disconnectReason") : "Account or key revoked";

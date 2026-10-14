@@ -465,6 +465,7 @@ the table names.
 | `file_gateway_outbox_file` (child of endpoint) | files waiting for pickup | `alias_id`, `file_name`, `size_bytes`, `sha256`, `storage_key`, `status` (READY, DOWNLOADED, REMOVED, EXPIRED), `first_downloaded_at`, `download_count`, `removed_at`, `expires_at`, `created_by_consumer` |
 | `file_gateway_transfer_log` (main, "Transfers") | every operation | `account_id`, `connection_log_id`, `operation` (LIST, UPLOAD, DOWNLOAD, RENAME, REMOVE), `path`, `object_kind` (APP, TABLE, PROFILE, VIEW, REPORT, RESULT, ARCHIVE, ENDPOINT, OUTBOX), `object_id`, `format`, `bytes`, `sha256`, `duration_ms`, `outcome` (OK, DENIED, NOT_FOUND, LIMIT, ERROR), `message`, `client_channel`, `upload_job_id` |
 | `file_gateway_connection_log` (main, "Connections") | every connection | `account_id`, `username`, `remote_ip`, `client_version`, `key_fingerprint`, `outcome` (CONNECTED, AUTH_FAILED, LOCKED_OUT, IP_DENIED, EXPIRED, DISABLED, LIMIT), `session_id`, `pod_name`, `connected_at`, `last_seen_at`, `disconnected_at`, `disconnect_reason`, `bytes_in`, `bytes_out`, `operation_count`, `client_channel` |
+| `file_gateway_server` (system, not in nav) | gateway pod heartbeats for the app home | `pod_name` (unique), `host_key_fingerprint`, `port`, `started_at`, `last_seen_at`; rows unseen for a day are deleted by retention |
 
 - **Child lists:**
   - an account shows its keys, upload jobs and connections;

@@ -152,8 +152,12 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
          .withTables(List.of(FileGatewayTables.UPLOAD_JOB, FileGatewayTables.TRANSFER_LOG, FileGatewayTables.CONNECTION_LOG)));
       FileGatewayTables.joins().forEach(output::add);
       FileGatewayTables.childWidgets().forEach(output::add);
+      var home = com.kingsrook.qbits.filegateway.metadata.FileGatewayHome.widgets();
+      home.forEach(output::add);
+      app.withWidgets(home.stream().map(widget -> widget.getName()).toList());
       output.add(app);
       FileGatewayProcesses.processes().forEach(output::add);
+      output.add(com.kingsrook.qbits.filegateway.maintenance.GatewayMaintenance.metadata(qBitConfig));
       output.add(new QAlertTypeMetaData().withName("filegateway.lockout").withLabel("File Gateway Lockout")
          .withSourceQBitName(qBit.getName()).withSubjectTableName(FileGatewayTables.ACCOUNT)
          .withVisibilityPermission(FileGatewayPermissions.VIEW));
@@ -168,6 +172,8 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
             channels.withDeniedPattern("sftp", pattern);
          }
       }
+      com.kingsrook.qbits.filegateway.api.FileGatewayOutbox.setProvider(new com.kingsrook.qbits.filegateway.outbox.OutboxService(qInstance,
+         new com.kingsrook.qbits.filegateway.storage.ObjectStorageGatewayStore(qInstance, qBitConfig.getFileGatewayBucketAlias()), qBitConfig, java.time.Clock.systemUTC()));
       return (new MetaDataProducerMultiOutput());
    }
 }

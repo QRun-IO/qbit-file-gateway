@@ -125,6 +125,17 @@ public class FileGatewayTestServer implements AutoCloseable
     *******************************************************************************/
    public FileGatewayTestServer(Clock clock, java.util.function.Consumer<QInstance> customize) throws Exception
    {
+      this(clock, customize, 0, false, true);
+   }
+
+
+
+   /*******************************************************************************
+    ** Demo and web-only tests can serve Next without starting an SFTP listener.
+    *******************************************************************************/
+   public FileGatewayTestServer(Clock clock, java.util.function.Consumer<QInstance> customize, int port, boolean frontend, boolean sftp) throws Exception
+   {
+      config.withSftpEnabled(sftp);
       ConnectionManager.resetConnectionProviders();
       GRANTS.clear();
       GRANTS.put("A", Set.of("file_gateway.connect", "alpha.read", "alpha.insert", "beta.read", "beta.insert"));
@@ -198,7 +209,7 @@ public class FileGatewayTestServer implements AutoCloseable
          {
             return (instance);
          }
-      }).withPort(0).withServeFrontendMaterialDashboard(false).withServeFrontendNext(false)
+      }).withPort(port).withServeFrontendMaterialDashboard(false).withServeFrontendNext(frontend)
          .withJavalinConfigCustomizer(j -> j.routes.before(ctx ->
          {
             calls.add(new ApiCall(ctx.method().name(), ctx.path(), ctx.header("X-QQQ-Client"), ctx.header("X-QQQ-Invoked-By")));
@@ -209,7 +220,11 @@ public class FileGatewayTestServer implements AutoCloseable
          }))
          .withStrictUiApiRoutes(true).withMiddlewareVersionList(List.of(new MiddlewareVersionV1()));
       http.start();
-      runtime = FileGatewayRuntime.startForTest(instance, http, config, KeyUtils.generateKeyPair("ecdsa-sha2-nistp256", 256), clock, Duration.ofHours(1), store);
+      runtime = sftp ? FileGatewayRuntime.startForTest(instance, http, config, KeyUtils.generateKeyPair("ecdsa-sha2-nistp256", 256), clock, Duration.ofHours(1), store) : null;
+      if(!sftp)
+      {
+         com.kingsrook.qbits.filegateway.api.FileGatewayOutbox.setProvider(new com.kingsrook.qbits.filegateway.outbox.OutboxService(instance, store, config, clock));
+      }
       client = SshClient.setUpDefaultClient();
       client.setServerKeyVerifier(AcceptAllServerKeyVerifier.INSTANCE);
       client.start();
@@ -355,7 +370,10 @@ public class FileGatewayTestServer implements AutoCloseable
    public void close() throws Exception
    {
       client.stop();
-      runtime.stop();
+      if(runtime != null)
+      {
+         runtime.stop();
+      }
       http.stop();
       keeper.close();
       QContext.clear();
@@ -368,6 +386,27 @@ public class FileGatewayTestServer implements AutoCloseable
     *******************************************************************************/
    public static class TestAuthentication implements QAuthenticationModuleCustomizerInterface
    {
+      /** Demo only: browser (MOCK) sessions get every permission in the instance. */
+      public static volatile boolean grantAllToUiSessions = false;
+
+
+
+      /*******************************************************************************
+       ** Browser sessions: nothing, unless the demo server switches it on.
+       *******************************************************************************/
+      @Override
+      public void customizeSession(QInstance instance, QSession session, Map<String, Object> context)
+      {
+         if(grantAllToUiSessions)
+         {
+            java.util.Set<String> all = new java.util.HashSet<>(com.kingsrook.qqq.backend.core.actions.permissions.PermissionsHelper.getAllAvailablePermissionNames(instance));
+            all.addAll(com.kingsrook.qbits.filegateway.permissions.FileGatewayPermissions.ALL);
+            session.setPermissions(all);
+         }
+      }
+
+
+
       /*******************************************************************************
        ** Customize automated session for user.
        *******************************************************************************/

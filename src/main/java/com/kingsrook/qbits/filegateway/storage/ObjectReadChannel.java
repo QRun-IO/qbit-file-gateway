@@ -60,6 +60,9 @@ public final class ObjectReadChannel implements SeekableByteChannel
    private final Ranges ranges;
    private final Completion completion;
    private long bytesRead;
+   private Completion fullDownload;
+   private long contiguousEnd;
+   private final java.util.TreeMap<Long, Long> readRanges = new java.util.TreeMap<>();
    private boolean failed;
    private long position;
    private boolean open = true;
@@ -109,6 +112,7 @@ public final class ObjectReadChannel implements SeekableByteChannel
             throw (new IOException("Stored object ended before its recorded size"));
          }
          destination.put(bytes);
+         recordRange(position, position + bytes.length);
          position += bytes.length;
          bytesRead += bytes.length;
          return (bytes.length);
@@ -191,8 +195,44 @@ public final class ObjectReadChannel implements SeekableByteChannel
       {
          open = false;
          completion.done(bytesRead, failed);
+         if(!failed && contiguousEnd >= size && fullDownload != null)
+         {
+            fullDownload.done(bytesRead, false);
+         }
       }
    }
+
+   /*******************************************************************************
+    ** Optional acknowledgment, only after all bytes have been read on this handle.
+    *******************************************************************************/
+   public ObjectReadChannel withFullDownload(Completion callback)
+   {
+      fullDownload = callback;
+      return (this);
+   }
+
+
+
+   /*******************************************************************************
+    ** Bounded interval tracking avoids counting repeated ranged reads as a complete file.
+    *******************************************************************************/
+   private void recordRange(long start, long end)
+   {
+      if(start <= contiguousEnd)
+      {
+         contiguousEnd = Math.max(contiguousEnd, end);
+      }
+      else if(readRanges.size() < 4096)
+      {
+         readRanges.merge(start, end, Math::max);
+      }
+      while(!readRanges.isEmpty() && readRanges.firstKey() <= contiguousEnd)
+      {
+         contiguousEnd = Math.max(contiguousEnd, readRanges.pollFirstEntry().getValue());
+      }
+   }
+
+
 
    /*******************************************************************************
     ** Reject use after close.
