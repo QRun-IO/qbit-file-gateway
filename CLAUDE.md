@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Guidance for coding agents working in this repository.
 
@@ -68,8 +68,12 @@ Phase (e) adds endpoints and chroot (`AliasCustomizer` validates paths), `outbox
 decrypt/encrypt, keys in memory), `maintenance/` (daily retention process and record-action
 effects), `FileGatewayHome` (typed STATISTICS and TABLE widgets only; guardrail G5),
 `FileGatewayIntegrations` (ESB, Quick Search, API lists) and `file_gateway_server` heartbeats.
-The Preferences "File transfer" section waits for QRun-IO/qqq#1162. The k8s example is in
-`docs/k8s/`.
+The `file-transfer` Preferences section requires only `file_gateway.connect`. Its provider uses
+core's trusted scope with the original session, derives identity only from the request context,
+and manages the caller's unrevoked USER-account keys through normal table actions. Add key
+creates an account on first use; Revoke sets `revoked_at`; PATCH edits labels and expiry.
+Optional `publicHostName` advertises the hostname; port/fingerprint use the latest heartbeat.
+The k8s example is in `docs/k8s/`.
 
 Tests run a strict UI API server, H2 from the adopter DDL and real MINA clients. NoDiskExtension
 snapshots the working tree (excluding target) and isolated test home, and asserts the test temp

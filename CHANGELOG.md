@@ -6,6 +6,11 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Added
 
+- File transfer Preferences with connect-permission visibility, read-only connection details,
+  optional public hostname, self-service Add key/Revoke actions and editable key labels/expiry.
+- First-key USER account creation with configured defaults and unique usernames; transactional
+  ownership checks, friendly duplicate-key validation, core/HTTP tests and real SFTP acceptance.
+
 - Phase (c) generated saved-view and saved-report downloads through the user-scoped UI API,
   CSV/XLSX/JSON account formats, a bounded rolling read window and HTTP stream cleanup.
 - Generated-file and UTC daily-download quotas, persisted byte charges under account locks,
@@ -49,8 +54,7 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   host-provided runtime dependency.
 - Alert type `filegateway.lockout` uses the dotted syntax required by core validation.
 - Object-storage RC.2 controls S3 part size through its connection configuration.
-- The Preferences "File transfer" section waits for QRun-IO/qqq#1162.
-- Private core #1170 sends multipart process values without re-uploading the original file.
+- Core #1170 sends multipart process values without re-uploading the original file.
 - FieldSecurityLock requires core permission enforcement enabled. Saved-report rendering still
   uses a temporary file inside core; fully disk-free report generation needs a core change.
   The report folder is hidden without the render process's configured storage table.

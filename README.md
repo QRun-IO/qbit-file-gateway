@@ -6,9 +6,9 @@ virtual folder tree. Application metadata and saved objects are read through the
 
 Phases (a) through (c) implement authentication, listing/stat, account administration, uploads into
 saved bulk-load profiles, background consumer delivery, readable sidecars/results/archive and
-saved-view/report downloads. Endpoint routing/chroot, outbox delivery, preferences and the app
-home follow in later phases. No native filesystem, host-key file, home directory or spool is
-used by the gateway. See [the approved design](docs/DESIGN.md).
+saved-view/report downloads. Phase (e) adds endpoint routing/chroot, outbox delivery, PGP,
+Preferences, retention and the app home. No native filesystem, host-key file, home directory
+or spool is used by the gateway. See [the approved design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -67,6 +67,25 @@ Create an ACTIVE account with a QQQ `userId`, then add an Ed25519, ECDSA, or RSA
 least 3072 bits. Public-key validation runs on insert and update and computes its unique SHA-256
 fingerprint, type and size. The host authentication module must assign the user's permissions
 when `createAutomatedSessionForUser` is called, including `file_gateway.connect`.
+
+## Preferences
+
+Users with `file_gateway.connect` manage their own SSH keys in **Preferences → File transfer**.
+They need no File Gateway admin or table permissions. **Add key** accepts an OpenSSH public key,
+a required label and optional expiry. The first successful key creates a USER account with
+FULL_TREE access, the configured account defaults and a unique login derived from the user ID.
+The section displays that login, plus the port and host key fingerprint from the latest gateway
+heartbeat. Set `.withPublicHostName("sftp.example.com")` on the shared config to display the
+public hostname; it defaults to null and is omitted when unset. The heartbeat port is the gateway
+listener port; deployments publishing a different external port must communicate that mapping.
+
+The keys list contains only the user's unrevoked keys. Users can edit labels and expiry dates,
+or choose **Revoke**. Revoked keys cannot sign in; existing sessions close at the next revocation
+poll (normally within 60 seconds). Fingerprints, key types and last-used times are read-only.
+Ed25519, ECDSA and RSA of at least 3072 bits are supported. Duplicate keys are rejected with a
+validation message. Normal table customizers and configured audits apply, attributed to the
+signed-in user and client channel. Administrators manage service accounts and other users' keys
+through the standard account and SSH-key tables.
 
 ## Tables and permissions
 
@@ -243,6 +262,7 @@ present without enabling those features.
 | Options | Defaults |
 |---|---|
 | `backendName`, `sftpEnabled`, `sftpPort` | `rdbms`, `false`, `2222` |
+| `publicHostName` | null (omit host from Preferences) |
 | `hostKeyEnvVarName`, `allowGeneratedHostKey` | `FILE_GATEWAY_SSH_HOST_KEY`, `false` |
 | `lockoutThreshold`, `lockoutWindow`, `lockoutDuration` | 5, 15 minutes, 30 minutes |
 | `maxConnectionsPerIpPerMinute` | 30 |

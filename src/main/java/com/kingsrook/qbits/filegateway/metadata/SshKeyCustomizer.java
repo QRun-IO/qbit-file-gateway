@@ -22,12 +22,21 @@ package com.kingsrook.qbits.filegateway.metadata;
 
 
 import java.security.PublicKey;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import com.kingsrook.qqq.backend.core.actions.customizers.TableCustomizerInterface;
+import com.kingsrook.qqq.backend.core.actions.tables.QueryAction;
+import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.model.actions.AbstractActionInput;
+import com.kingsrook.qqq.backend.core.model.actions.tables.insert.InsertInput;
+import com.kingsrook.qqq.backend.core.model.actions.tables.query.QCriteriaOperator;
+import com.kingsrook.qqq.backend.core.model.actions.tables.query.QQueryFilter;
+import com.kingsrook.qqq.backend.core.model.actions.tables.query.QueryInput;
+import com.kingsrook.qqq.backend.core.model.actions.tables.update.UpdateInput;
 import com.kingsrook.qqq.backend.core.model.data.QRecord;
 import com.kingsrook.qqq.backend.core.model.statusmessages.BadInputStatusMessage;
 import org.apache.sshd.common.config.keys.KeyUtils;
@@ -47,8 +56,9 @@ public class SshKeyCustomizer implements TableCustomizerInterface
     ** Parse and validate inserts and partial updates without logging key material.
     *******************************************************************************/
    @Override
-   public List<QRecord> preInsertOrUpdate(AbstractActionInput input, List<QRecord> records, boolean isPreview, Optional<List<QRecord>> oldRecords)
+   public List<QRecord> preInsertOrUpdate(AbstractActionInput input, List<QRecord> records, boolean isPreview, Optional<List<QRecord>> oldRecords) throws QException
    {
+      Set<String> fingerprints = new HashSet<>();
       for(QRecord record : records)
       {
          QRecord old = oldRecords.orElse(List.of()).stream().filter(candidate -> Objects.equals(candidate.getValue("id"), record.getValue("id"))).findFirst().orElse(null);
@@ -69,6 +79,19 @@ public class SshKeyCustomizer implements TableCustomizerInterface
          catch(Exception e)
          {
             record.addError(new BadInputStatusMessage("Use an OpenSSH Ed25519, ECDSA, or RSA key of at least 3072 bits"));
+            continue;
+         }
+         // Core's unique-key check precedes this computed fingerprint.
+         QQueryFilter filter = new QQueryFilter().withCriteria("fingerprint", QCriteriaOperator.EQUALS, record.getValue("fingerprint"));
+         if(old != null)
+         {
+            filter.withCriteria("id", QCriteriaOperator.NOT_EQUALS, old.getValue("id"));
+         }
+         var transaction = input instanceof InsertInput insert ? insert.getTransaction() : ((UpdateInput) input).getTransaction();
+         if(!fingerprints.add(record.getValueString("fingerprint")) || !new QueryAction().execute(new QueryInput(FileGatewayTables.SSH_KEY)
+            .withFilter(filter.withLimit(1)).withTransaction(transaction)).getRecords().isEmpty())
+         {
+            record.addError(new BadInputStatusMessage("Fingerprint: this SSH key is already registered. Use a different key."));
          }
       }
       return (records);

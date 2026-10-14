@@ -171,6 +171,7 @@ public class FileGatewayQBitProducer implements QBitMetaDataProducer<FileGateway
          .withSourceQBitName(qBit.getName()).withSubjectTableName(FileGatewayTables.ACCOUNT)
          .withVisibilityPermission(FileGatewayPermissions.VIEW));
       output.addSelfToInstance(qInstance);
+      com.kingsrook.qbits.filegateway.preferences.FileTransferPreferencesProvider.register(qInstance, qBitConfig);
       ClientChannelsMetaData channels = ClientChannelsMetaData.ofOrWithNew(qInstance)
          .withChannel("sftp", "SFTP file gateway").withDeniedPattern("sftp", "file_gateway_*")
          .withDeniedPattern("assistant", "file_gateway_*");

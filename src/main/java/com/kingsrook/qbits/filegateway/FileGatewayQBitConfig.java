@@ -39,6 +39,7 @@ public class FileGatewayQBitConfig implements QBitConfig
    private String backendName = "rdbms";
    private boolean sftpEnabled = false;
    private int sftpPort = 2222;
+   private String publicHostName = null;
    private String hostKeyEnvVarName = "FILE_GATEWAY_SSH_HOST_KEY";
    private boolean allowGeneratedHostKey = false;
    private String fileGatewayBucketAlias = "file-gateway";
@@ -119,6 +120,27 @@ public class FileGatewayQBitConfig implements QBitConfig
    public int getSftpPort()
    {
       return (sftpPort);
+   }
+
+
+
+   /*******************************************************************************
+    ** Public SFTP hostname advertised in Preferences, when configured.
+    *******************************************************************************/
+   public String getPublicHostName()
+   {
+      return (publicHostName);
+   }
+
+
+
+   /*******************************************************************************
+    ** Set the public SFTP hostname; null omits it from Preferences.
+    *******************************************************************************/
+   public FileGatewayQBitConfig withPublicHostName(String publicHostName)
+   {
+      this.publicHostName = publicHostName;
+      return (this);
    }
 
 
