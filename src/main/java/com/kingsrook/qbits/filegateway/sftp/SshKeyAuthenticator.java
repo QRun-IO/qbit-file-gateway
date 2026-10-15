@@ -82,16 +82,15 @@ public class SshKeyAuthenticator implements PublickeyAuthenticator, FileGatewayA
 
 
    /*******************************************************************************
-    ** Audit TCP accept and enforce the pre-authentication connection rate.
+    ** Track TCP accept and enforce the pre-authentication connection rate. The
+    ** connection-log row is written at the first sign-in attempt (or a refusal),
+    ** so TCP health probes and port scans that never authenticate leave no row.
     *******************************************************************************/
    public synchronized void accepted(ServerSession ssh) throws QException
    {
       GatewaySession state = new GatewaySession(instance, ssh, clock);
       ssh.setAttribute(GatewaySession.ATTRIBUTE, state);
-      state.connectionId = audit.insert(FileGatewayTables.CONNECTION_LOG, new QRecord()
-         .withValue("sessionId", state.id).withValue("remoteIp", state.remoteIp).withValue("podName", podName)
-         .withValue("connectedAt", clock.instant()).withValue("lastSeenAt", clock.instant())
-         .withValue("clientChannel", "sftp").withValue("outcome", "AUTH_FAILED")).getValueInteger("id");
+      state.connectedAt = clock.instant();
       sessions.put(state.id, state);
       prune(connections, clock.instant().minusSeconds(60));
       Deque<Instant> window = connections.computeIfAbsent(state.remoteIp, ignored -> new ArrayDeque<>());
@@ -144,6 +143,7 @@ public class SshKeyAuthenticator implements PublickeyAuthenticator, FileGatewayA
       }
       QRecord account = first(FileGatewayTables.ACCOUNT, "username", username);
       String fingerprint = KeyUtils.getFingerPrint(BuiltinDigests.sha256, publicKey);
+      ensureConnectionRow(state);
       audit.update(FileGatewayTables.CONNECTION_LOG, new QRecord().withValue("id", state.connectionId)
          .withValue("username", username).withValue("keyFingerprint", fingerprint).withValue("clientVersion", ssh.getClientVersion())
          .withValue("accountId", account == null ? null : account.getValue("id")));
@@ -293,10 +293,29 @@ public class SshKeyAuthenticator implements PublickeyAuthenticator, FileGatewayA
 
 
    /*******************************************************************************
+    ** Write the connection-log row on first need (an auth attempt or a refusal).
+    ** Its outcome stays AUTH_FAILED until the sign-in succeeds.
+    *******************************************************************************/
+   private void ensureConnectionRow(GatewaySession state) throws QException
+   {
+      if(state.connectionId == null)
+      {
+         Instant at = state.connectedAt == null ? clock.instant() : state.connectedAt;
+         state.connectionId = audit.insert(FileGatewayTables.CONNECTION_LOG, new QRecord()
+            .withValue("sessionId", state.id).withValue("remoteIp", state.remoteIp).withValue("podName", podName)
+            .withValue("connectedAt", at).withValue("lastSeenAt", clock.instant())
+            .withValue("clientChannel", "sftp").withValue("outcome", "AUTH_FAILED")).getValueInteger("id");
+      }
+   }
+
+
+
+   /*******************************************************************************
     ** Record the authentication outcome without credentials.
     *******************************************************************************/
    private boolean outcome(GatewaySession state, String outcome, String reason) throws QException
    {
+      ensureConnectionRow(state);
       audit.update(FileGatewayTables.CONNECTION_LOG, new QRecord().withValue("id", state.connectionId)
          .withValue("outcome", outcome).withValue("disconnectReason", reason).withValue("lastSeenAt", clock.instant()));
       if(reason != null)
