@@ -458,9 +458,11 @@ sized for the largest report. The no-disk test asserts the temp area is empty af
   (§15) would add only a server and an authenticator.
 
 ## 7. Audit
-- **Connections.** Every connection writes `file_gateway_connection_log`. The row is opened at TCP
-  accept and updated at auth and at disconnect. It records the outcome, IP, key fingerprint, SSH
-  client version, byte and operation counts, and channel `sftp`.
+- **Connections.** Every sign-in attempt writes `file_gateway_connection_log`. The row is opened
+  at the first authentication attempt (or a pre-auth refusal such as the connection rate limit)
+  and updated at auth and at disconnect. It records the outcome, IP, key fingerprint, SSH client
+  version, byte and operation counts, and channel `sftp`. A TCP connection that never tries to
+  sign in, such as a kubelet health probe or a port scan, leaves no row.
 - **Operations.** Every list, upload, download, rename and remove writes
   `file_gateway_transfer_log`. It records the operation, path, object kind and id, bytes, sha256,
   duration, outcome and message, with channel `sftp/<sessionId>`.
