@@ -48,6 +48,7 @@ public class GatewaySession
    public final ServerSession ssh;
    public final String remoteIp;
    public Integer connectionId;
+   public java.time.Instant connectedAt;
    public QRecord account;
    public QRecord key;
    public long operations;

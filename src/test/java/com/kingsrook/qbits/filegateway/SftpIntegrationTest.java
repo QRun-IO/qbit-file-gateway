@@ -79,6 +79,35 @@ class SftpIntegrationTest
 
 
    /*******************************************************************************
+    ** A TCP connection that never signs in (a health probe or port scan) leaves
+    ** no connection-log row and no failure; a real sign-in attempt does.
+    *******************************************************************************/
+   @Test
+   void tcpProbeLeavesNoConnectionRow() throws Exception
+   {
+      try(var h = new FileGatewayTestServer())
+      {
+         for(int i = 0; i < 3; i++)
+         {
+            try(java.net.Socket socket = new java.net.Socket("127.0.0.1", h.runtime.getProtocol().getPort()))
+            {
+               socket.setSoTimeout(2000);
+               socket.getInputStream().read();
+            }
+         }
+         Thread.sleep(300);
+         assertThat(h.audit.query("file_gateway_connection_log", new QQueryFilter())).isEmpty();
+
+         KeyPair unknown = pair();
+         org.assertj.core.api.Assertions.assertThatThrownBy(() -> h.login("nobody", unknown)).isInstanceOf(Exception.class);
+         assertThat(h.audit.query("file_gateway_connection_log", new QQueryFilter())).singleElement()
+            .satisfies(row -> assertThat(row.getValueString("outcome")).isEqualTo("AUTH_FAILED"));
+      }
+   }
+
+
+
+   /*******************************************************************************
     ** Permission filtered listings and audit.
     *******************************************************************************/
    @Test
