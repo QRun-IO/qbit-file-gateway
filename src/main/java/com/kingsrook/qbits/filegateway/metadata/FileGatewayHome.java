@@ -108,13 +108,13 @@ public class FileGatewayHome extends AbstractWidgetRenderer
          long value = "transfers".equals(key) ? rows.size() : rows.stream()
             .filter(row -> ("in".equals(key) ? "UPLOAD" : "DOWNLOAD").equals(row.getValueString("operation")))
             .mapToLong(row -> number(row, "bytes")).sum();
-         return (new StatisticsData("transfers".equals(key) ? value : Math.round(value / 10485.76) / 100.0, null, null));
+         return (new StatisticsData("transfers".equals(key) ? value : Math.round(value / 10485.76) / 100.0, null, null).withIncreaseIsGood(true));
       }
       if("locked".equals(key))
       {
          long count = query(FileGatewayTables.ACCOUNT, new QQueryFilter()).stream().filter(row -> "LOCKED".equals(row.getValueString("status"))
             || (row.getValueInstant("lockedUntil") != null && row.getValueInstant("lockedUntil").isAfter(now))).count();
-         return (new StatisticsData(count, null, null));
+         return (new StatisticsData(count, null, null).withIncreaseIsGood(false));
       }
       if(List.of("failures", "recent").contains(key))
       {
@@ -122,24 +122,26 @@ public class FileGatewayHome extends AbstractWidgetRenderer
             .withCriteria(new QFilterCriteria("status", QCriteriaOperator.IN, "FAILED", "PARTIAL", "REJECTED")));
          if("failures".equals(key))
          {
-            return (new StatisticsData(rows.size(), null, null));
+            return (new StatisticsData(rows.size(), null, null).withIncreaseIsGood(false));
          }
          rows.sort(java.util.Comparator.comparing((QRecord row) -> row.getValueInstant("finishedAt")).reversed());
          return (table("Recent failures", FileGatewayTables.UPLOAD_JOB, rows.stream().limit(20).toList(),
-            List.of("fileName", "status", "errorMessage", "finishedAt"), List.of("File", "Status", "Message", "Finished")));
+            List.of("fileName", "status", "errorMessage", "finishedAt"), List.of("File", "Status", "Message", "Finished"), "No failed transfers in the last 7 days."));
       }
       if(List.of("sessions", "active").contains(key))
       {
          var rows = query(FileGatewayTables.CONNECTION_LOG, since("lastSeenAt", now.minusSeconds(180))
             .withCriteria(new QFilterCriteria("disconnectedAt", QCriteriaOperator.IS_BLANK))
             .withCriteria(new QFilterCriteria("outcome", QCriteriaOperator.EQUALS, "CONNECTED")));
-         return ("sessions".equals(key) ? new StatisticsData(rows.size(), null, null) : table("Active sessions", FileGatewayTables.CONNECTION_LOG, rows,
-            List.of("username", "remoteIp", "connectedAt", "operationCount"), List.of("Username", "IP", "Connected", "Operations")));
+         return ("sessions".equals(key) ? new StatisticsData(rows.size(), null, null).withIncreaseIsGood(true) : table("Active sessions", FileGatewayTables.CONNECTION_LOG, rows,
+            List.of("username", "remoteIp", "connectedAt", "operationCount"), List.of("Username", "IP", "Connected", "Operations"),
+            "No one is connected right now (no session has been seen in the last 3 minutes)."));
       }
       if("servers".equals(key))
       {
          return (table("Server", FileGatewayTables.SERVER, query(FileGatewayTables.SERVER, since("lastSeenAt", now.minusSeconds(180))),
-            List.of("podName", "hostKeyFingerprint", "port", "lastSeenAt"), List.of("Pod", "Host key fingerprint", "Port", "Last seen")));
+            List.of("podName", "hostKeyFingerprint", "port", "lastSeenAt"), List.of("Pod", "Host key fingerprint", "Port", "Last seen"),
+            "No gateway server has reported in during the last 3 minutes."));
       }
       Map<Integer, QRecord> partners = new LinkedHashMap<>();
       for(QRecord account : query(FileGatewayTables.ACCOUNT, new QQueryFilter()))
@@ -157,7 +159,8 @@ public class FileGatewayHome extends AbstractWidgetRenderer
       }
       List<QRecord> rows = partners.values().stream().filter(row -> number(row, "transfers") > 0)
          .sorted(java.util.Comparator.comparingLong((QRecord row) -> number(row, "transfers")).reversed()).limit(10).toList();
-      return (table("Top partners (7 days)", FileGatewayTables.ACCOUNT, rows, List.of("username", "transfers", "mb"), List.of("Partner", "Transfers", "MB")));
+      return (table("Top partners (7 days)", FileGatewayTables.ACCOUNT, rows, List.of("username", "transfers", "mb"), List.of("Partner", "Transfers", "MB"),
+         "No partner has transferred a file in the last 7 days."));
    }
 
 
@@ -165,7 +168,7 @@ public class FileGatewayHome extends AbstractWidgetRenderer
    /*******************************************************************************
     ** Typed text blocks carry record links; cells never contain markup.
     *******************************************************************************/
-   private TableData table(String label, String table, List<QRecord> records, List<String> fields, List<String> labels)
+   private TableData table(String label, String table, List<QRecord> records, List<String> fields, List<String> labels, String noRowsText)
    {
       List<TableData.Column> columns = new ArrayList<>();
       for(int i = 0; i < fields.size(); i++)
@@ -185,7 +188,7 @@ public class FileGatewayHome extends AbstractWidgetRenderer
             .withLink("/record/" + table + "/" + record.getValue("id")));
          rows.add(row);
       }
-      return (new TableData(null, columns, rows).withRowsPerPage(10).withHidePaginationDropdown(true));
+      return (new TableData(null, columns, rows).withRowsPerPage(10).withHidePaginationDropdown(true).withNoRowsFoundHTML(noRowsText));
    }
 
 
