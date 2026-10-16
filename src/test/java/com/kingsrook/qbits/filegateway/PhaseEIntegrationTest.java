@@ -274,6 +274,24 @@ class PhaseEIntegrationTest
          assertThat(((Number) ((StatisticsData) home.data("out", now)).getCount()).doubleValue()).isEqualTo(1);
          assertThat(((Number) ((StatisticsData) home.data("failures", now)).getCount()).intValue()).isEqualTo(1);
          assertThat(((TableData) home.data("recent", now)).getRows()).hasSize(1);
+         ///////////////////////////////////////////////////////////////////////////////
+         // direction: failures and locks are bad when they grow; volume is not bad  //
+         ///////////////////////////////////////////////////////////////////////////////
+         assertThat(((StatisticsData) home.data("failures", now)).getIncreaseIsGood()).as("failures").isFalse();
+         assertThat(((StatisticsData) home.data("locked", now)).getIncreaseIsGood()).as("locked").isFalse();
+         for(String key : List.of("transfers", "in", "out", "sessions"))
+         {
+            assertThat(((StatisticsData) home.data(key, now)).getIncreaseIsGood()).as(key).isTrue();
+         }
+         ///////////////////////////////////////////////////////////////////////////////
+         // every home table says why it is empty                                     //
+         ///////////////////////////////////////////////////////////////////////////////
+         for(String key : List.of("recent", "partners", "active", "servers"))
+         {
+            assertThat(((TableData) home.data(key, now)).getNoRowsFoundHTML()).as(key).isNotBlank();
+         }
+         assertThat(((TableData) home.data("active", now)).getRows()).isEmpty();
+         assertThat(((TableData) home.data("active", now)).getNoRowsFoundHTML()).contains("No one is connected");
          //////////////////////////////////////////////////////////////////
          // readable at all widths: home tables declare no column widths //
          //////////////////////////////////////////////////////////////////
