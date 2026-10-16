@@ -22,14 +22,19 @@ package com.kingsrook.qbits.filegateway.permissions;
 
 
 import com.kingsrook.qbits.filegateway.metadata.FileGatewayTables;
+import com.kingsrook.qqq.backend.core.actions.permissions.AvailablePermission;
 import com.kingsrook.qqq.backend.core.actions.permissions.CustomPermissionChecker;
+import com.kingsrook.qqq.backend.core.actions.permissions.PermissionSubType;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QPermissionDeniedException;
 import com.kingsrook.qqq.backend.core.model.actions.AbstractActionInput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.delete.DeleteInput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.insert.InsertInput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.update.UpdateInput;
+import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppMetaData;
+import com.kingsrook.qqq.backend.core.model.metadata.permissions.MetaDataWithName;
 import com.kingsrook.qqq.backend.core.model.metadata.permissions.MetaDataWithPermissionRules;
+import com.kingsrook.qqq.backend.core.model.metadata.permissions.QPermissionRules;
 import com.kingsrook.qqq.backend.core.model.metadata.processes.QProcessMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
 import com.kingsrook.qqq.backend.core.model.session.QSession;
@@ -59,5 +64,43 @@ public class FileGatewayPermissionChecker implements CustomPermissionChecker
       {
          throw (new QPermissionDeniedException("Missing file gateway permission"));
       }
+   }
+
+
+
+   /*******************************************************************************
+    ** This checker gates on the three gateway permission names, not on per-object
+    ** names, so it tells the catalog (getAllAvailablePermissions) those names.
+    *******************************************************************************/
+   @Override
+   public boolean handlesBuildAvailablePermission()
+   {
+      return (true);
+   }
+
+
+
+   /*******************************************************************************
+    ** Collapse every gateway object onto file_gateway.view, .admin or .connect.
+    ** The object name and type are fixed so the catalog (a set) lists each name
+    ** once: reads and the app need view, writes and processes need admin, and the
+    ** app also stands for SFTP sign-in (connect), which the gateway grants to
+    ** sessions rather than checking on an object.
+    *******************************************************************************/
+   @Override
+   public AvailablePermission buildAvailablePermission(QPermissionRules rules, PermissionSubType permissionSubType, String baseName, MetaDataWithName metaDataWithName, String objectType)
+   {
+      AvailablePermission base = buildBaseAvailablePermission(rules, permissionSubType, metaDataWithName, objectType);
+      if(base == null)
+      {
+         return (null);
+      }
+      boolean write = "WRITE".equals(base.getPermissionType()) || "Process".equals(objectType);
+      String  name  = write ? FileGatewayPermissions.ADMIN : FileGatewayPermissions.VIEW;
+      if(metaDataWithName instanceof QAppMetaData)
+      {
+         name = FileGatewayPermissions.CONNECT;
+      }
+      return (base.withName(name).withObjectName("File Gateway").withObjectType("App").withPermissionType(name.substring(name.indexOf('.') + 1)));
    }
 }
