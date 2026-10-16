@@ -22,6 +22,8 @@ package com.kingsrook.qbits.filegateway;
 
 import java.util.List;
 import com.kingsrook.qbits.filegateway.metadata.FileGatewayTables;
+import com.kingsrook.qbits.filegateway.permissions.FileGatewayPermissions;
+import com.kingsrook.qqq.backend.core.actions.permissions.PermissionsHelper;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
 import com.kingsrook.qqq.backend.core.model.metadata.permissions.ClientChannelsMetaData;
 import org.junit.jupiter.api.Test;
@@ -69,6 +71,21 @@ class FileGatewayQBitProducerTest
       assertThat(channels.isDenied("assistant", "file_gateway_ssh_key", null)).isTrue();
       assertThat(channels.isDenied("sftp", "orders", null)).isFalse();
       assertThat(instance.getTable(FileGatewayTables.ALIAS).getField("tableName").getPossibleValueSourceName()).isEqualTo("tables");
+   }
+
+
+
+   /*******************************************************************************
+    ** The three gateway permission names reach QQQ's catalog, so identity
+    ** policies can grant them.
+    *******************************************************************************/
+   @Test
+   void permissionsAreInTheAvailableCatalog() throws Exception
+   {
+      var instance = new QInstance();
+      var config = new FileGatewayQBitConfig().withBackendName("host-db");
+      new FileGatewayQBitProducer().withQBitConfig(config).withNamespace("test").produce(instance).addSelfToInstance(instance);
+      assertThat(PermissionsHelper.getAllAvailablePermissionNames(instance)).containsAll(FileGatewayPermissions.ALL);
    }
 
 
